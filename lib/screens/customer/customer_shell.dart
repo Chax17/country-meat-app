@@ -92,7 +92,12 @@ class _CustomerShellState extends State<CustomerShell> {
     // ── Auth Flow ────────────────────────────────────────────────────────
     if (_authStep == CustomerAuthStep.splash) {
       return CustSplashScreen(
-        onDone: () => setState(() => _authStep = CustomerAuthStep.onboarding),
+        onDone: () {
+          final isLoggedIn = context.read<AppState>().isLoggedIn;
+          setState(() {
+            _authStep = isLoggedIn ? CustomerAuthStep.done : CustomerAuthStep.onboarding;
+          });
+        },
       );
     }
     if (_authStep == CustomerAuthStep.onboarding) {

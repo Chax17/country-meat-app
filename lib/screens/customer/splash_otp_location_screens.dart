@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 
 // ─── SPLASH ──────────────────────────────────────────────────────────────────
-// Design: Full red screen (#C0392B) with white logo centered — matches reference
+// Design: Two distinct Figma splash states with a simple cross-fade transition
+// State 1: Red background + native white logo
+// State 2: White background + red logo (Fades in over State 1)
 class CustSplashScreen extends StatefulWidget {
   final VoidCallback onDone;
   const CustSplashScreen({super.key, required this.onDone});
@@ -17,43 +19,99 @@ class _CustSplashScreenState extends State<CustSplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _fade;
-  Timer? _timer;
+  Timer? _timer1;
+  Timer? _timer2;
 
   @override
   void initState() {
     super.initState();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 700));
-    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
-    _ctrl.forward();
-    _timer = Timer(const Duration(milliseconds: 800), () {
-      if (mounted) {
-        widget.onDone();
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    _fade = CurvedAnimation(
+      parent: _ctrl,
+      curve: Curves.easeInOut,
+    );
+
+    // Ensure initial frame (State 1: Red background + white logo) is painted before starting hold timer
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _timer1 = Timer(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
+          _ctrl.forward();
+        }
+      });
+    });
+
+    _ctrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        // State 2 hold (~600ms) -> Route to Home or Welcome
+        _timer2 = Timer(const Duration(milliseconds: 600), () {
+          if (mounted) {
+            widget.onDone();
+          }
+        });
       }
     });
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(const AssetImage('assets/images/logo_white.png'), context);
+    precacheImage(const AssetImage('assets/images/logo_transp.png'), context);
+  }
+
+  @override
   void dispose() {
-    _timer?.cancel();
+    _timer1?.cancel();
+    _timer2?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final logoWidth = MediaQuery.of(context).size.width * 0.7;
+
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: FadeTransition(
-        opacity: _fade,
-        child: Center(
-          child: Image.asset(
-            'assets/images/logo.png',
-            width: MediaQuery.of(context).size.width * 0.7,
-            fit: BoxFit.contain,
+      body: Stack(
+        children: [
+          // ── STATE 1: Red background + dedicated white logo asset ─────────
+          Container(
+            color: AppColors.brandRed,
+            child: Center(
+              child: Image.asset(
+                'assets/images/logo_white.png',
+                width: logoWidth,
+                fit: BoxFit.contain,
+                gaplessPlayback: true,
+              ),
+            ),
           ),
-        ),
+          // ── STATE 2: White background + red logo (Cross-fades over State 1) ─
+          FadeTransition(
+            opacity: _fade,
+            child: Container(
+              color: Colors.white,
+              child: Center(
+                child: Image.asset(
+                  'assets/images/logo_transp.png',
+                  width: logoWidth,
+                  fit: BoxFit.contain,
+                  color: AppColors.brandRed,
+                  colorBlendMode: BlendMode.srcIn,
+                  gaplessPlayback: true,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

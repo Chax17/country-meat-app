@@ -21,6 +21,8 @@ class _CustSplashScreenState extends State<CustSplashScreen>
   late final Animation<double> _fade;
   Timer? _timer1;
   Timer? _timer2;
+  bool _isInitStarted = false;
+  bool _isPrecached = false;
 
   @override
   void initState() {
@@ -37,17 +39,6 @@ class _CustSplashScreenState extends State<CustSplashScreen>
       curve: Curves.easeInOut,
     );
 
-    // Ensure initial frame (State 1: Red background + white logo) is painted before starting hold timer
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _timer1 = Timer(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
-          _ctrl.forward();
-        }
-      });
-    });
-
     _ctrl.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         // State 2 hold (~600ms) -> Route to Home or Welcome
@@ -63,8 +54,33 @@ class _CustSplashScreenState extends State<CustSplashScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    precacheImage(const AssetImage('assets/images/logo_white.png'), context);
-    precacheImage(const AssetImage('assets/images/logo_transp.png'), context);
+    if (!_isInitStarted) {
+      _isInitStarted = true;
+      _initSplash();
+    }
+  }
+
+  Future<void> _initSplash() async {
+    // Precache both splash logo assets so they are fully decoded into GPU memory
+    // before presenting the first splash frame.
+    await Future.wait([
+      precacheImage(const AssetImage('assets/images/logo_white.png'), context),
+      precacheImage(const AssetImage('assets/images/logo_transp.png'), context),
+    ]);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isPrecached = true;
+    });
+
+    // State 1 hold (~800ms) -> Start cross-fade to State 2
+    _timer1 = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
+        _ctrl.forward();
+      }
+    });
   }
 
   @override
@@ -77,6 +93,10 @@ class _CustSplashScreenState extends State<CustSplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (!_isPrecached) {
+      return const SizedBox.shrink();
+    }
+
     final logoWidth = MediaQuery.of(context).size.width * 0.7;
 
     return Scaffold(
@@ -90,7 +110,6 @@ class _CustSplashScreenState extends State<CustSplashScreen>
                 'assets/images/logo_white.png',
                 width: logoWidth,
                 fit: BoxFit.contain,
-                gaplessPlayback: true,
               ),
             ),
           ),
@@ -106,7 +125,6 @@ class _CustSplashScreenState extends State<CustSplashScreen>
                   fit: BoxFit.contain,
                   color: AppColors.brandRed,
                   colorBlendMode: BlendMode.srcIn,
-                  gaplessPlayback: true,
                 ),
               ),
             ),

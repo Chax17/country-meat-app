@@ -136,39 +136,58 @@ class _CustSplashScreenState extends State<CustSplashScreen>
 }
 
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
-// Design: Clean single page — solid red top with white logo centered,
-// white bottom card with tagline + Get Started button
+// Design: Solid red background with white logo at top, six circular value proposition
+// illustrations centered in middle, and white bottom card with tagline + Get Started
 class CustOnboardingScreen extends StatelessWidget {
   final VoidCallback onDone;
   const CustOnboardingScreen({super.key, required this.onDone});
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final logoWidth = mediaQuery.size.width * 0.7;
+
     return Scaffold(
       backgroundColor: AppColors.brandRed,
       body: SafeArea(
         child: Column(
           children: [
-            // ── Red top section with ONLY logo ────────────────────────────────
+            // ── Top Section: Country Meat Logo + Value Circles ────────────────
             Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Image.asset(
-                    'assets/images/logo_transp.png',
-                    width: MediaQuery.of(context).size.width * 0.7,
-                    fit: BoxFit.contain,
-                    color: Colors.white,
-                    colorBlendMode: BlendMode.srcIn,
-                    errorBuilder: (_, __, ___) => Image.asset(
-                      'assets/images/logo.png',
-                      width: MediaQuery.of(context).size.width * 0.7,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Column(
+                  children: [
+                    // Country Meat logo (cropped asset without 68.7% vertical transparent padding)
+                    Image.asset(
+                      'assets/images/logo_white_cropped.png',
+                      width: logoWidth,
                       fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Image.asset(
+                        'assets/images/logo_white.png',
+                        width: logoWidth,
+                        fit: BoxFit.contain,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    // Six circular illustrated value propositions
+                    Expanded(
+                      child: Center(
+                        child: Image.asset(
+                          'assets/images/getStarted.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Image.asset(
+                            'assets/images/ob_icon5.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+
             // ── White bottom card ─────────────────────────────────────────────
             Container(
               width: double.infinity,

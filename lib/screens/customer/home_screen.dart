@@ -33,6 +33,16 @@ class _CustHomeScreenState extends State<CustHomeScreen> {
     'Order Tonight. Fresh Meat by 6AM.',
   ];
 
+  static const _whyChooseUsImages = [
+    'assets/images/whyCooseUs/ogCountry.png',
+    'assets/images/whyCooseUs/free-range.png',
+    'assets/images/whyCooseUs/natualfeed.png',
+    'assets/images/whyCooseUs/antiboitic.png',
+    'assets/images/whyCooseUs/naturally.png',
+    'assets/images/whyCooseUs/farmers.png',
+    'assets/images/whyCooseUs/delivery.png',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -316,37 +326,45 @@ class _CustHomeScreenState extends State<CustHomeScreen> {
           ),
         ),
 
-        // ── Why Country Meat ─────────────────────────────────────────────────
-        Container(
-          margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppColors.brandRedBg,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: const Color(0xFFFFDADA)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Why Country Meat? 🐓',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                      color: AppColors.brandRedDark)),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _WhyChip('✓ Antibiotic Residue Free'),
-                  _WhyChip('✓ 100% Natural Growth'),
-                  _WhyChip('✓ Open Farm Raised'),
-                  _WhyChip('✓ Free-Range Certified'),
-                  _WhyChip('✓ No Hormones'),
-                  _WhyChip('✓ Dawn Delivery'),
-                ],
-              ),
-            ],
+        // ── Why Choose Us? ───────────────────────────────────────────────────
+        const _SectionHeader(title: 'Why Choose Us?'),
+        SizedBox(
+          height: 195,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _whyChooseUsImages.length,
+            itemBuilder: (context, index) {
+              final imgPath = _whyChooseUsImages[index];
+              return Container(
+                width: 275,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    imgPath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: AppColors.gray100,
+                      child: const Center(
+                        child: Icon(Icons.verified_user_rounded,
+                            color: AppColors.brandRed, size: 32),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
 
@@ -603,28 +621,6 @@ class _CatCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _WhyChip extends StatelessWidget {
-  final String text;
-  const _WhyChip(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.full),
-        border: Border.all(color: const Color(0xFFFFD0D0)),
-      ),
-      child: Text(text,
-          style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: AppColors.brandRedDark)),
     );
   }
 }

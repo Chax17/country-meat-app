@@ -61,7 +61,7 @@ class _CustSplashScreenState extends State<CustSplashScreen>
   }
 
   Future<void> _initSplash() async {
-    // Precache both splash logo assets so they are fully decoded into GPU memory
+    // Precache splash logo assets so they are fully decoded into GPU memory
     // before presenting the first splash frame.
     await Future.wait([
       precacheImage(const AssetImage('assets/images/logo_white.png'), context),
@@ -137,10 +137,51 @@ class _CustSplashScreenState extends State<CustSplashScreen>
 
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
 // Design: Solid red background with white logo at top, six circular value proposition
-// illustrations centered in middle, and white bottom card with tagline + Get Started
-class CustOnboardingScreen extends StatelessWidget {
+// illustrations centered in middle, and white bottom card with tagline + Get Started.
+// Entrance: Subtle 350ms Fade + Slide transition for complete screen composition.
+class CustOnboardingScreen extends StatefulWidget {
   final VoidCallback onDone;
   const CustOnboardingScreen({super.key, required this.onDone});
+
+  @override
+  State<CustOnboardingScreen> createState() => _CustOnboardingScreenState();
+}
+
+class _CustOnboardingScreenState extends State<CustOnboardingScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+
+    _fade = CurvedAnimation(
+      parent: _ctrl,
+      curve: Curves.easeOutCubic,
+    );
+
+    _slide = Tween<Offset>(
+      begin: const Offset(0.0, 0.04),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _ctrl,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,111 +190,118 @@ class CustOnboardingScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.brandRed,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ── Top Section: Country Meat Logo + Value Circles ────────────────
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Column(
-                  children: [
-                    // Country Meat logo (cropped asset without 68.7% vertical transparent padding)
-                    Image.asset(
-                      'assets/images/logo_white_cropped.png',
-                      width: logoWidth,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/logo_white.png',
-                        width: logoWidth,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Six circular illustrated value propositions
-                    Expanded(
-                      child: Center(
-                        child: Image.asset(
-                          'assets/images/getStarted.png',
+      body: FadeTransition(
+        opacity: _fade,
+        child: SlideTransition(
+          position: _slide,
+          child: SafeArea(
+            child: Column(
+              children: [
+                // ── Top Section: Country Meat Logo + Value Circles ────────────────
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                    child: Column(
+                      children: [
+                        // Country Meat logo (cropped asset without 68.7% vertical transparent padding)
+                        Image.asset(
+                          'assets/images/logo_white_cropped.png',
+                          width: logoWidth,
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => Image.asset(
-                            'assets/images/ob_icon5.png',
+                            'assets/images/logo_white.png',
+                            width: logoWidth,
                             fit: BoxFit.contain,
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ── White bottom card ─────────────────────────────────────────────
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    text: const TextSpan(
-                      style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.gray500,
-                          fontFamily: 'Inter'),
-                      children: [
-                        TextSpan(text: 'Welcome to '),
-                        TextSpan(
-                          text: 'Country Meat',
-                          style: TextStyle(
-                            color: AppColors.brandRed,
-                            fontWeight: FontWeight.w700,
+                        const SizedBox(height: 12),
+                        // Six circular illustrated value propositions
+                        Expanded(
+                          child: Center(
+                            child: Image.asset(
+                              'assets/images/getStarted.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Image.asset(
+                                'assets/images/ob_icon5.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'A company by the meat lovers\nfor the meat lovers',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.gray900,
-                      height: 1.25,
-                    ),
+                ),
+
+                // ── White bottom card ─────────────────────────────────────────────
+                Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                   ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: onDone,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.brandRed,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                        ),
-                        elevation: 0,
-                        textStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'Inter',
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      RichText(
+                        text: const TextSpan(
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.gray500,
+                            fontFamily: 'Inter',
+                          ),
+                          children: [
+                            TextSpan(text: 'Welcome to '),
+                            TextSpan(
+                              text: 'Country Meat',
+                              style: TextStyle(
+                                color: AppColors.brandRed,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: const Text('Get Started'),
-                    ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'A company by the meat lovers\nfor the meat lovers',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.gray900,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: widget.onDone,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.brandRed,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                            textStyle: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                          child: const Text('Get Started'),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -353,6 +401,11 @@ class _CustLoginScreenState extends State<CustLoginScreen> {
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                focusedErrorBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
                                 hintText: '9876543210',
                                 hintStyle: TextStyle(color: AppColors.gray300),
                                 contentPadding: EdgeInsets.symmetric(horizontal: 14),

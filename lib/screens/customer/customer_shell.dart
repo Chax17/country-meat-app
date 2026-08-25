@@ -106,27 +106,54 @@ class _CustomerShellState extends State<CustomerShell> {
       );
     }
     if (_authStep == CustomerAuthStep.login) {
-      return CustLoginScreen(
-        onContinue: (phone) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
           setState(() {
-            _userPhone = phone;
-            _authStep = CustomerAuthStep.otp;
+            _authStep = CustomerAuthStep.onboarding;
           });
         },
+        child: CustLoginScreen(
+          onContinue: (phone) {
+            setState(() {
+              _userPhone = phone;
+              _authStep = CustomerAuthStep.otp;
+            });
+          },
+        ),
       );
     }
     if (_authStep == CustomerAuthStep.otp) {
-      return CustOtpScreen(
-        phone: _userPhone,
-        onContinue: () {
-          context.read<AppState>().updateUser('Arjun Kumar', '+91 $_userPhone');
-          setState(() => _authStep = CustomerAuthStep.location);
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          setState(() {
+            _authStep = CustomerAuthStep.login;
+          });
         },
+        child: CustOtpScreen(
+          phone: _userPhone,
+          onContinue: () {
+            context.read<AppState>().updateUser('Arjun Kumar', '+91 $_userPhone');
+            setState(() => _authStep = CustomerAuthStep.location);
+          },
+        ),
       );
     }
     if (_authStep == CustomerAuthStep.location) {
-      return CustLocationScreen(
-        onContinue: () => setState(() => _authStep = CustomerAuthStep.done),
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          setState(() {
+            _authStep = CustomerAuthStep.otp;
+          });
+        },
+        child: CustLocationScreen(
+          onContinue: () => setState(() => _authStep = CustomerAuthStep.done),
+        ),
       );
     }
 

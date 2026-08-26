@@ -81,13 +81,21 @@ class FirebaseService {
         'date': order.date,
         'total': order.total,
         'status': order.status,
+        'statusEnum': order.statusEnum.name,
         'deliverySlot': order.deliverySlot,
         'agent': order.agent,
         'agentPhone': order.agentPhone,
+        'driverName': order.driverInfo.name,
+        'driverPhone': order.driverInfo.phone,
+        'driverRating': order.driverInfo.rating,
+        'driverVehicleNo': order.driverInfo.vehicleNo,
         'address': order.address,
         'points': order.points,
         'paymentMethod': order.paymentMethod,
         'txnId': order.txnId,
+        'etaText': order.etaText,
+        'ratingScore': order.ratingScore,
+        'ratingFeedback': order.ratingFeedback,
         'timestamp': FieldValue.serverTimestamp(),
         'items': order.items.map((item) => {
           'productId': item.product.id,
@@ -99,7 +107,7 @@ class FirebaseService {
           'price': item.product.price,
           'lineTotal': item.lineTotal,
         }).toList(),
-      });
+      }, SetOptions(merge: true));
       debugPrint('📦 Order ${order.id} saved to Firestore!');
     } catch (e) {
       debugPrint('⚠️ Error saving order to Firestore: $e');
@@ -131,19 +139,39 @@ class FirebaseService {
           );
         }).toList();
 
+        final statusStr = data['status'] ?? 'Confirmed';
+        final statusEnum = data['statusEnum'] != null
+            ? OrderStatus.values.firstWhere(
+                (e) => e.name == data['statusEnum'],
+                orElse: () => OrderStatus.fromString(statusStr),
+              )
+            : OrderStatus.fromString(statusStr);
+
+        final driver = DriverInfo(
+          name: data['driverName'] ?? data['agent'] ?? 'Harish Shetty',
+          phone: data['driverPhone'] ?? data['agentPhone'] ?? '+91 9876543210',
+          rating: (data['driverRating'] ?? 4.9).toDouble(),
+          vehicleNo: data['driverVehicleNo'] ?? 'KA 09 EA 4521',
+        );
+
         return CustomerOrder(
           id: data['id'] ?? doc.id,
           date: data['date'] ?? '',
           items: items,
           total: (data['total'] ?? 0) as int,
-          status: data['status'] ?? 'Confirmed',
+          status: statusStr,
+          statusEnum: statusEnum,
           deliverySlot: data['deliverySlot'] ?? '6AM–9AM',
-          agent: data['agent'] ?? 'Ravi Kumar',
-          agentPhone: data['agentPhone'] ?? '+91 9876543210',
+          agent: driver.name,
+          agentPhone: driver.phone,
+          driverInfo: driver,
           address: data['address'] ?? '',
           points: (data['points'] ?? 0) as int,
           paymentMethod: data['paymentMethod'] ?? 'UPI / Online',
           txnId: data['txnId'] ?? '',
+          etaText: data['etaText'] ?? '25–35 mins',
+          ratingScore: data['ratingScore'] as int?,
+          ratingFeedback: data['ratingFeedback'] as String?,
         );
       }).toList();
     });

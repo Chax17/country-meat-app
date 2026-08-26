@@ -71,9 +71,17 @@ class AppState extends ChangeNotifier {
       items: List.from(cart),
       total: orderTotal,
       status: 'Confirmed',
+      statusEnum: OrderStatus.confirmed,
       deliverySlot: slot,
-      agent: 'Ravi Kumar',
+      agent: 'Harish Shetty',
       agentPhone: '+91 9876543210',
+      driverInfo: const DriverInfo(
+        name: 'Harish Shetty',
+        phone: '+91 9876543210',
+        avatarImg: 'assets/images/whyCooseUs/hygienic.png',
+        rating: 4.9,
+        vehicleNo: 'KA 09 EA 4521',
+      ),
       address: address,
       points: (orderTotal * 0.05).round(),
       paymentMethod: paymentMethod,
@@ -88,6 +96,47 @@ class AppState extends ChangeNotifier {
     // Persist to Firestore
     _firebaseService.saveOrder(newOrder);
     _syncUserToFirestore();
+  }
+
+  void updateOrderStatus(String orderId, OrderStatus nextStatus) {
+    final idx = orders.indexWhere((o) => o.id == orderId);
+    if (idx != -1) {
+      orders[idx] = orders[idx].copyWith(
+        statusEnum: nextStatus,
+        status: nextStatus.label,
+      );
+      notifyListeners();
+      _firebaseService.saveOrder(orders[idx]);
+    }
+  }
+
+  void rateOrder(String orderId, int score, String feedback) {
+    final idx = orders.indexWhere((o) => o.id == orderId);
+    if (idx != -1) {
+      orders[idx] = orders[idx].copyWith(
+        ratingScore: score,
+        ratingFeedback: feedback,
+      );
+      notifyListeners();
+      _firebaseService.saveOrder(orders[idx]);
+    }
+  }
+
+  // Dev-only helper to step through lifecycle states for testing
+  void advanceOrderStatus(String orderId) {
+    final idx = orders.indexWhere((o) => o.id == orderId);
+    if (idx != -1) {
+      final current = orders[idx].statusEnum;
+      final next = switch (current) {
+        OrderStatus.confirmed => OrderStatus.slaughtering,
+        OrderStatus.slaughtering => OrderStatus.driverAssigned,
+        OrderStatus.driverAssigned => OrderStatus.outForDelivery,
+        OrderStatus.outForDelivery => OrderStatus.delivered,
+        OrderStatus.delivered => OrderStatus.confirmed,
+        OrderStatus.cancelled => OrderStatus.confirmed,
+      };
+      updateOrderStatus(orderId, next);
+    }
   }
 
   String lastOrderId = '';

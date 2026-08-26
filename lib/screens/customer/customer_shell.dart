@@ -81,9 +81,15 @@ class _CustomerShellState extends State<CustomerShell> {
       return;
     }
 
-    // Handle checkout completion: do not allow back to return to payment or cart
+    // Handle checkout & post-rating completion: purge completed flow screens from back history
     if (screen == 'confirmation' || screen == 'tracking') {
       _history.removeWhere((item) => item.screen == 'payment' || item.screen == 'cart');
+    } else if (screen == 'home') {
+      _history.removeWhere((item) =>
+          item.screen == 'tracking' ||
+          item.screen == 'confirmation' ||
+          item.screen == 'payment' ||
+          item.screen == 'cart');
     }
 
     _pushHistory();

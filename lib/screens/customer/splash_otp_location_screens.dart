@@ -1,7 +1,12 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../models/product.dart';
+import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
+import 'home_screen.dart';
 
 // ─── SPLASH ──────────────────────────────────────────────────────────────────
 // Design: Two distinct Figma splash states with a simple cross-fade transition
@@ -290,7 +295,6 @@ class _CustOnboardingScreenState extends State<CustOnboardingScreen>
                             textStyle: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              fontFamily: 'Inter',
                             ),
                           ),
                           child: const Text('Get Started'),
@@ -310,7 +314,7 @@ class _CustOnboardingScreenState extends State<CustOnboardingScreen>
 
 // ─── PHONE LOGIN ─────────────────────────────────────────────────────────────
 class CustLoginScreen extends StatefulWidget {
-  final void Function(String phone) onContinue;
+  final ValueChanged<String> onContinue;
   const CustLoginScreen({super.key, required this.onContinue});
 
   @override
@@ -328,8 +332,40 @@ class _CustLoginScreenState extends State<CustLoginScreen> {
 
   void _submit() {
     final raw = _ctrl.text.trim();
-    final phone = raw.isEmpty ? '9876543210' : raw;
-    widget.onContinue(phone);
+    final phoneNum = raw.isEmpty ? '9876543210' : raw;
+    final fullPhone = phoneNum.startsWith('+91') ? phoneNum : '+91 $phoneNum';
+    widget.onContinue(fullPhone);
+  }
+
+  Widget _buildIndiaFlag() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(2),
+      child: SizedBox(
+        width: 22,
+        height: 15,
+        child: Column(
+          children: [
+            Expanded(child: Container(color: const Color(0xFFFF9933))),
+            Expanded(
+              child: Container(
+                color: Colors.white,
+                child: Center(
+                  child: Container(
+                    width: 4,
+                    height: 4,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF000080),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(child: Container(color: const Color(0xFF138808))),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -347,75 +383,125 @@ class _CustLoginScreenState extends State<CustLoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 32),
-                      // Logo small
-                      Image.asset(
-                        'assets/images/logo_transp.png',
-                        height: 48,
-                        fit: BoxFit.contain,
-                        color: AppColors.brandRed,
-                        colorBlendMode: BlendMode.srcIn,
-                        errorBuilder: (_, __, ___) => Image.asset(
-                            'assets/images/logo.png', height: 48),
-                      ),
-                      const SizedBox(height: 36),
-                      const Text(
-                        'Enter your\nphone number',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.gray900,
-                          height: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        "We'll send you a verification code",
-                        style: TextStyle(color: AppColors.gray500, fontSize: 14),
-                      ),
-                      const SizedBox(height: 32),
-                      // Phone input
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.gray200, width: 1.5),
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                        ),
-                        child: Row(children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-                            decoration: const BoxDecoration(
-                              border: Border(
-                                  right: BorderSide(color: AppColors.gray200, width: 1.5)),
-                            ),
-                            child: const Text('+91',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16,
-                                    color: AppColors.gray700)),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: _ctrl,
-                              keyboardType: TextInputType.phone,
-                              maxLength: 10,
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                errorBorder: InputBorder.none,
-                                focusedErrorBorder: InputBorder.none,
-                                disabledBorder: InputBorder.none,
-                                hintText: '9876543210',
-                                hintStyle: TextStyle(color: AppColors.gray300),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 14),
-                                counterText: '',
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: IconButton(
+                            onPressed: () => Navigator.of(context).maybePop(),
+                            icon: const Icon(Icons.chevron_left),
+                            iconSize: 18,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            style: IconButton.styleFrom(
+                              shape: const CircleBorder(),
+                              side: const BorderSide(
+                                color: AppColors.gray300,
+                                width: 1,
                               ),
                             ),
                           ),
-                        ]),
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      // Logo small
+                      Center(
+                        child: Image.asset(
+                          'assets/images/logo_white_cropped.png',
+                          width: 190,
+                          fit: BoxFit.contain,
+                          color: AppColors.brandRed,
+                          colorBlendMode: BlendMode.srcIn,
+                        ),
+                      ),
+                      const SizedBox(height: 36),
+                      const Text(
+                        'Login with your mobile number',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.gray900,
+                        ),
                       ),
                       const SizedBox(height: 24),
+                      const Text(
+                        'Mobile Number',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.gray800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Phone input
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3E6E6),
+                          border: Border.all(color: const Color(0xFFE2C8C8), width: 1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            _buildIndiaFlag(),
+                            Container(
+                              width: 1,
+                              height: 18,
+                              color: const Color(0xFFD4BDBD),
+                              margin: const EdgeInsets.symmetric(horizontal: 10),
+                            ),
+                            const Text(
+                              '+91',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF9E8A8A),
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 18,
+                              color: const Color(0xFFD4BDBD),
+                              margin: const EdgeInsets.symmetric(horizontal: 10),
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: _ctrl,
+                                keyboardType: TextInputType.phone,
+                                maxLength: 10,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.gray900,
+                                ),
+                                decoration: const InputDecoration(
+                                  filled: false,
+                                  fillColor: Colors.transparent,
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  errorBorder: InputBorder.none,
+                                  focusedErrorBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
+                                  hintText: '12345-67890',
+                                  hintStyle: TextStyle(
+                                    color: Color(0xFF9E8A8A),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  contentPadding: EdgeInsets.zero,
+                                  isDense: true,
+                                  counterText: '',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -423,22 +509,17 @@ class _CustLoginScreenState extends State<CustLoginScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.brandRed,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadius.md)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             elevation: 0,
                             textStyle: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w700),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                          child: const Text('Send OTP'),
-                        ),
-                      ),
-                      const Spacer(),
-                      const Center(
-                        child: Text(
-                          'By continuing, you agree to our\nTerms of Service & Privacy Policy',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.gray400, fontSize: 12, height: 1.5),
+                          child: const Text('Get OTP'),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -468,19 +549,29 @@ class _CustOtpScreenState extends State<CustOtpScreen> {
   final _controllers = List.generate(4, (_) => TextEditingController());
   final _focusNodes = List.generate(4, (_) => FocusNode());
   int _secondsLeft = 30;
-  late Timer _timer;
+  Timer? _timer;
+  bool _hasSubmitted = false;
+  int _resendCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _startTimer();
+    _startTimer(30);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNodes[0].requestFocus();
+      if (mounted) {
+        _focusNodes[0].requestFocus();
+      }
     });
   }
 
-  void _startTimer() {
+  void _startTimer([int seconds = 30]) {
+    _timer?.cancel();
+    _secondsLeft = seconds;
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
       if (_secondsLeft > 0) {
         setState(() => _secondsLeft--);
       } else {
@@ -489,154 +580,183 @@ class _CustOtpScreenState extends State<CustOtpScreen> {
     });
   }
 
+  void _handleResend() {
+    if (_resendCount >= 2 || _secondsLeft > 0) return;
+    setState(() {
+      _resendCount++;
+    });
+    _startTimer(59);
+  }
+
   @override
   void dispose() {
-    _timer.cancel();
-    for (final c in _controllers) { c.dispose(); }
-    for (final f in _focusNodes) { f.dispose(); }
+    _timer?.cancel();
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    for (final f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final displayPhone = widget.phone.isNotEmpty ? widget.phone : '9876543210';
+  String get _formattedPhone {
+    final raw = widget.phone.trim();
+    if (raw.isEmpty) {
+      return '+91 9876543210';
+    }
+    if (raw.startsWith('+91')) {
+      final digits = raw.substring(3).trim();
+      return '+91 ${digits.isEmpty ? "9876543210" : digits}';
+    }
+    return '+91 $raw';
+  }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: const BackButton(color: AppColors.gray700),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 12),
-            Image.asset(
-              'assets/images/logo_transp.png',
-              height: 44,
-              color: AppColors.brandRed,
-              colorBlendMode: BlendMode.srcIn,
-              errorBuilder: (_, __, ___) =>
-                  Image.asset('assets/images/logo.png', height: 44),
+  void _triggerContinue() {
+    if (!_hasSubmitted) {
+      _hasSubmitted = true;
+      widget.onContinue();
+    }
+  }
+
+  void _handleOtpChanged(int index, String value) {
+    if (value.length == 1 && index < 3) {
+      _focusNodes[index + 1].requestFocus();
+    } else if (value.isEmpty && index > 0) {
+      _focusNodes[index - 1].requestFocus();
+    }
+
+    // Auto verify when all 4 boxes are filled
+    if (_controllers.every((c) => c.text.isNotEmpty)) {
+      _triggerContinue();
+    }
+  }
+
+  Widget _buildOtpFields() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(4, (i) {
+        return Container(
+          width: 56,
+          height: 58,
+          margin: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3E6E6),
+            border: Border.all(
+              color: _focusNodes[i].hasFocus
+                  ? AppColors.brandRed
+                  : const Color(0xFFE2C8C8),
+              width: 1.5,
             ),
-            const SizedBox(height: 32),
-            const Text('Verify your number',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 8),
-            Text('Enter the 4-digit OTP sent to +91 $displayPhone',
-                style: const TextStyle(color: AppColors.gray500, fontSize: 14)),
-            const SizedBox(height: 36),
-            // OTP boxes
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(4, (i) => _OtpBox(
-                  controller: _controllers[i],
-                  focusNode: _focusNodes[i],
-                  onChanged: (v) {
-                    if (v.length == 1 && i < 3) {
-                      _focusNodes[i + 1].requestFocus();
-                    } else if (v.isEmpty && i > 0) {
-                      _focusNodes[i - 1].requestFocus();
-                    }
-                    // Auto verify when all filled
-                    if (_controllers.every((c) => c.text.isNotEmpty)) {
-                      Future.delayed(const Duration(milliseconds: 200), widget.onContinue);
-                    }
-                  },
-                )),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: TextField(
+              controller: _controllers[i],
+              focusNode: _focusNodes[i],
+              onChanged: (v) => _handleOtpChanged(i, v),
+              textAlign: TextAlign.center,
+              keyboardType: TextInputType.number,
+              maxLength: 1,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: AppColors.brandRed,
+              ),
+              decoration: const InputDecoration(
+                filled: false,
+                fillColor: Colors.transparent,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+                counterText: '',
               ),
             ),
-            const SizedBox(height: 24),
-            // Resend
-            Center(
-              child: _secondsLeft > 0
-                  ? Text('Resend OTP in 0:${_secondsLeft.toString().padLeft(2, '0')}',
-                      style: const TextStyle(color: AppColors.gray500, fontSize: 13))
-                  : GestureDetector(
-                      onTap: () {
-                        setState(() => _secondsLeft = 30);
-                        _startTimer();
-                      },
-                      child: const Text('Resend OTP',
-                          style: TextStyle(
-                              color: AppColors.brandRed,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13)),
-                    ),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: widget.onContinue,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.brandRed,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.md)),
-                  elevation: 0,
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildResendSection() {
+    // Stage 1: Countdown is active - show ONLY the timer, no Resend button
+    if (_secondsLeft > 0) {
+      return Center(
+        child: RichText(
+          text: TextSpan(
+            style: const TextStyle(color: AppColors.gray500, fontSize: 13),
+            children: [
+              const TextSpan(text: "Resend OTP in "),
+              TextSpan(
+                text: '${_secondsLeft}s',
+                style: const TextStyle(
+                  color: AppColors.brandRed,
+                  fontWeight: FontWeight.w600,
                 ),
-                child: const Text('Verify & Continue'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Stage 2: Timer reached 0 & user has resends remaining (< 2 resends used)
+    if (_resendCount < 2) {
+      return Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              "Didn't receive any OTP? ",
+              style: TextStyle(color: AppColors.gray500, fontSize: 13),
+            ),
+            GestureDetector(
+              onTap: _handleResend,
+              child: const Text(
+                'Resend OTP',
+                style: TextStyle(
+                  color: AppColors.brandRed,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
               ),
             ),
-            const SizedBox(height: 24),
           ],
         ),
+      );
+    }
+
+    // Stage 3: Timer reached 0 & user reached max limit (2 resends completed)
+    return Center(
+      child: Column(
+        children: [
+          const Text(
+            "Didn't receive OTP after multiple attempts?",
+            style: TextStyle(color: AppColors.gray500, fontSize: 13),
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () => Navigator.of(context).maybePop(),
+            child: const Text(
+              'check phone number',
+              style: TextStyle(
+                color: AppColors.brandRed,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                decoration: TextDecoration.underline,
+                decorationColor: AppColors.brandRed,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-}
-
-class _OtpBox extends StatelessWidget {
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final ValueChanged<String> onChanged;
-  const _OtpBox({
-    required this.controller,
-    required this.focusNode,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 58,
-      height: 60,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.gray200, width: 2),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        color: AppColors.gray50,
-      ),
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        onChanged: onChanged,
-        textAlign: TextAlign.center,
-        keyboardType: TextInputType.number,
-        maxLength: 1,
-        style: const TextStyle(
-            fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.brandRed),
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-          counterText: '',
-        ),
-      ),
-    );
-  }
-}
-
-// ─── LOCATION ─────────────────────────────────────────────────────────────────
-class CustLocationScreen extends StatelessWidget {
-  final VoidCallback onContinue;
-  const CustLocationScreen({super.key, required this.onContinue});
 
   @override
   Widget build(BuildContext context) {
@@ -651,92 +771,91 @@ class CustLocationScreen extends StatelessWidget {
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: IntrinsicHeight(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 24),
-                      Image.asset(
-                        'assets/images/logo_transp.png',
-                        height: 44,
-                        color: AppColors.brandRed,
-                        colorBlendMode: BlendMode.srcIn,
-                        errorBuilder: (_, __, ___) =>
-                            Image.asset('assets/images/logo.png', height: 44),
-                      ),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const SizedBox(height: 20),
-                            // Location illustration
-                            Container(
-                              width: 140,
-                              height: 140,
-                              decoration: const BoxDecoration(
-                                color: AppColors.brandRedBg,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.location_on_rounded,
-                                size: 70,
-                                color: AppColors.brandRed,
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: IconButton(
+                            onPressed: () => Navigator.of(context).maybePop(),
+                            icon: const Icon(Icons.chevron_left),
+                            iconSize: 18,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            style: IconButton.styleFrom(
+                              shape: const CircleBorder(),
+                              side: const BorderSide(
+                                color: AppColors.gray300,
+                                width: 1,
                               ),
                             ),
-                            const SizedBox(height: 28),
-                            const Text(
-                              'Set your\ndelivery location',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w900,
-                                height: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'We deliver fresh country meat every morning.\nTell us where to bring it.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  color: AppColors.gray500, fontSize: 14, height: 1.5),
-                            ),
-                            const SizedBox(height: 28),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: onContinue,
-                                icon: const Icon(Icons.my_location_rounded),
-                                label: const Text('Use Current Location'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.brandRed,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(AppRadius.md)),
-                                  elevation: 0,
-                                  textStyle: const TextStyle(
-                                      fontSize: 16, fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton(
-                                onPressed: onContinue,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.brandRed,
-                                  side: const BorderSide(color: AppColors.brandRed),
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(AppRadius.md)),
-                                  textStyle: const TextStyle(
-                                      fontSize: 16, fontWeight: FontWeight.w600),
-                                ),
-                                child: const Text('Enter Address Manually'),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                          ],
+                          ),
                         ),
                       ),
+                      const SizedBox(height: 28),
+                      // Logo small
+                      Center(
+                        child: Image.asset(
+                          'assets/images/logo_white_cropped.png',
+                          width: 190,
+                          fit: BoxFit.contain,
+                          color: AppColors.brandRed,
+                          colorBlendMode: BlendMode.srcIn,
+                        ),
+                      ),
+                      const SizedBox(height: 36),
+                      Center(
+                        child: const Text(
+                          'Verify with OTP sent to',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                          color: AppColors.gray900,
+                        ),
+                      ),
+                      ),
+                      const SizedBox(height: 6),
+                      Center(
+                        child: Text(
+                          _formattedPhone,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.gray600,
+                        ),
+                      ),
+                      ),
+                      const SizedBox(height: 28),
+                      // 4 OTP Boxes
+                      _buildOtpFields(),
+                      const SizedBox(height: 16),
+                      // Resend text / timer
+                      _buildResendSection(),
+                      const Spacer(),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _triggerContinue,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.brandRed,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                            textStyle: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          child: const Text('Continue'),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -747,4 +866,1124 @@ class CustLocationScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─── LOCATION ─────────────────────────────────────────────────────────────────
+enum _LocationStep {
+  initial,
+  selectLocation,
+  search,
+  map,
+  addressDetails,
+}
+
+class CustLocationScreen extends StatefulWidget {
+  final VoidCallback onContinue;
+  const CustLocationScreen({super.key, required this.onContinue});
+
+  @override
+  State<CustLocationScreen> createState() => _CustLocationScreenState();
+}
+
+class _CustLocationScreenState extends State<CustLocationScreen> {
+  _LocationStep _step = _LocationStep.initial;
+  String _selectedTag = 'Home'; // 'Home', 'Friend and Family', 'Others'
+  String _currentLocationTitle = 'HSR Layout';
+  String _currentSubAddress = 'HSR Layout, Gowtham PG, Bengaluru, Karnataka, India';
+
+  late final TextEditingController _flatCtrl;
+  late final TextEditingController _areaCtrl;
+  late final TextEditingController _receiverNameCtrl;
+  late final TextEditingController _receiverPhoneCtrl;
+  late final TextEditingController _searchCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _flatCtrl = TextEditingController();
+    _areaCtrl = TextEditingController();
+    _receiverNameCtrl = TextEditingController();
+    _receiverPhoneCtrl = TextEditingController();
+    _searchCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _flatCtrl.dispose();
+    _areaCtrl.dispose();
+    _receiverNameCtrl.dispose();
+    _receiverPhoneCtrl.dispose();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _goBack() {
+    setState(() {
+      if (_step == _LocationStep.addressDetails) {
+        _step = _LocationStep.map;
+      } else if (_step == _LocationStep.map || _step == _LocationStep.search) {
+        _step = _LocationStep.selectLocation;
+      } else if (_step == _LocationStep.selectLocation) {
+        _step = _LocationStep.initial;
+      }
+    });
+  }
+
+  void _saveAndProceed(AppState appState) {
+    final flat = _flatCtrl.text.trim();
+    final area = _areaCtrl.text.trim();
+    final effectiveFlat = flat.isNotEmpty ? flat : 'Flat 200';
+    final effectiveArea = area.isNotEmpty ? area : 'Lakshmi Residency, Road No. 4';
+
+    final fullAddr = '$effectiveFlat, $effectiveArea, $_currentSubAddress';
+
+    String label = _selectedTag;
+    if (_selectedTag == 'Others') {
+      final name = _receiverNameCtrl.text.trim();
+      label = name.isNotEmpty ? name : 'Others';
+    } else if (_selectedTag == 'Friend and Family') {
+      final name = _receiverNameCtrl.text.trim();
+      label = name.isNotEmpty ? name : 'Friend & Family';
+    }
+
+    final newAddr = SavedAddress(
+      label: label,
+      address: fullAddr,
+      isDefault: true,
+    );
+
+    appState.addAddress(newAddr);
+    appState.setDefaultAddress(newAddr);
+    widget.onContinue();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+
+    return PopScope(
+      canPop: _step == _LocationStep.initial,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _goBack();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: _buildStepContent(context, appState),
+      ),
+    );
+  }
+
+  Widget _buildStepContent(BuildContext context, AppState appState) {
+    switch (_step) {
+      case _LocationStep.initial:
+        return _buildInitialState(context, appState);
+      case _LocationStep.selectLocation:
+        return _buildSelectLocationState(context, appState);
+      case _LocationStep.search:
+        return _buildSearchState(context, appState);
+      case _LocationStep.map:
+        return _buildMapState(context, appState);
+      case _LocationStep.addressDetails:
+        return _buildAddressDetailsState(context, appState);
+    }
+  }
+
+  // ── STATE 1: Choose Your Location Modal over dimmed & blurred Home background ────────
+  Widget _buildInitialState(BuildContext context, AppState appState) {
+    return Stack(
+      children: [
+        // Real CustHomeScreen underlying background (gestures absorbed)
+        Positioned.fill(
+          child: AbsorbPointer(
+            absorbing: true,
+            child: CustHomeScreen(
+              nav: (route, {param}) {},
+            ),
+          ),
+        ),
+
+        // Backdrop blur & dimming overlay
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.4),
+            ),
+          ),
+        ),
+
+        // Bottom Sheet Card
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Choose Your Location',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.gray900,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Enable location access to get the freshest meat delivered to your doorstep.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: AppColors.gray600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Red Pin Graphic
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      child: const Icon(
+                        Icons.location_on_rounded,
+                        color: AppColors.brandRed,
+                        size: 38,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Primary button: Use Current Location
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      _saveAndProceed(appState);
+                    },
+                    icon: const Icon(Icons.my_location_rounded, size: 18),
+                    label: const Text('Use Current Location'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.brandRed,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Secondary button: Select Your Location
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _step = _LocationStep.selectLocation;
+                      });
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.brandRed,
+                      side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
+                      backgroundColor: const Color(0xFFFEF2F2),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    child: const Text('Select Your Location'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── STATE 2: Select Your Location ──────────────────────────────────────────
+  Widget _buildSelectLocationState(BuildContext context, AppState appState) {
+    final savedList = appState.addresses.isEmpty
+        ? const [
+            SavedAddress(
+              label: 'HOME',
+              address: 'Flat 203, Lakshmi Residency, Road No. 4, Banjara Hills, Bangalore, Karnataka - 500034',
+              isDefault: true,
+            ),
+            SavedAddress(
+              label: 'DILIP',
+              address: 'Flat 203, Lakshmi Residency, Road No. 4, Banjara Hills, Bangalore, Karnataka - 500034',
+            ),
+          ]
+        : appState.addresses;
+
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.gray800),
+                    onPressed: _goBack,
+                  ),
+                ),
+                const Text(
+                  'Select your Location',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.gray900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Search Bar (White background, light gray border matching Figma)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _step = _LocationStep.search;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.search_rounded, color: AppColors.brandRed, size: 20),
+                          SizedBox(width: 10),
+                          Text(
+                            'Search an area or address',
+                            style: TextStyle(color: AppColors.gray400, fontSize: 13.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Use current location button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _step = _LocationStep.addressDetails;
+                        });
+                      },
+                      icon: const Icon(Icons.my_location_rounded, size: 18),
+                      label: const Text('Use current location'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.brandRed,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                        textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Add new Address button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _step = _LocationStep.map;
+                        });
+                      },
+                      icon: const Icon(Icons.add_rounded, size: 20, color: AppColors.brandRed),
+                      label: const Text('Add new Address'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.brandRed,
+                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+                        backgroundColor: const Color(0xFFFEF2F2),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Saved Address Section
+                  const Text(
+                    'Saved Address',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.gray500,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Cards
+                  ...savedList.map((addr) {
+                    final isHome = addr.label.toUpperCase().contains('HOME');
+                    return GestureDetector(
+                      onTap: () {
+                        appState.setDefaultAddress(addr);
+                        widget.onContinue();
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              isHome ? Icons.home_rounded : Icons.people_alt_rounded,
+                              color: AppColors.gray600,
+                              size: 28,
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    addr.label.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.gray900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    addr.address,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.gray600,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.more_vert_rounded, color: AppColors.gray400, size: 20),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── STATE 3: Search Location ────────────────────────────────────────────────
+  Widget _buildSearchState(BuildContext context, AppState appState) {
+    final suggestions = const [
+      {'title': 'HSR Layout', 'subtitle': 'Bengaluru, Karnataka, India'},
+      {'title': 'Banjara Hills', 'subtitle': 'Hyderabad, Telangana, India'},
+      {'title': 'Indiranagar', 'subtitle': 'Bengaluru, Karnataka, India'},
+      {'title': 'Koramangala', 'subtitle': 'Bengaluru, Karnataka, India'},
+    ];
+
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Search Bar Header with Close X
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.gray300),
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        icon: Icon(Icons.search_rounded, color: AppColors.brandRed, size: 20),
+                        hintText: 'Search an area or address',
+                        border: InputBorder.none,
+                        hintStyle: TextStyle(color: AppColors.gray400, fontSize: 13.5),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: AppColors.gray700),
+                  onPressed: _goBack,
+                ),
+              ],
+            ),
+          ),
+
+          // Use current location button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _step = _LocationStep.addressDetails;
+                  });
+                },
+                icon: const Icon(Icons.my_location_rounded, size: 18),
+                label: const Text('Use current location'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandRed,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ),
+
+          const Divider(height: 24),
+
+          // Suggestions
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: suggestions.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, idx) {
+                final s = suggestions[idx];
+                return ListTile(
+                  leading: const Icon(Icons.location_on_outlined, color: AppColors.brandRed),
+                  title: Text(s['title']!, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  subtitle: Text(s['subtitle']!, style: const TextStyle(fontSize: 12, color: AppColors.gray500)),
+                  onTap: () {
+                    setState(() {
+                      _currentLocationTitle = s['title']!;
+                      _currentSubAddress = '${s['title']!}, ${s['subtitle']!}';
+                      _step = _LocationStep.map;
+                    });
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── STATE 4: Map Location Selection ─────────────────────────────────────────
+  Widget _buildMapState(BuildContext context, AppState appState) {
+    return Stack(
+      children: [
+        // Stylized vector map background representation
+        Positioned.fill(
+          child: Container(
+            color: const Color(0xFFF3F4F6),
+            child: CustomPaint(
+              painter: _MapGridPainter(),
+            ),
+          ),
+        ),
+
+        // Centered pin marker aligned exactly with center of blue accuracy circle
+        Center(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Blue accuracy circle
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.25),
+                  border: Border.all(color: const Color(0xFF3B82F6), width: 2),
+                ),
+              ),
+              // Pin icon positioned so its tip sits right at center
+              Transform.translate(
+                offset: const Offset(0, -21),
+                child: const Icon(
+                  Icons.location_on_rounded,
+                  color: AppColors.brandRed,
+                  size: 42,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Floating "Current location" pill button on map
+        Positioned(
+          bottom: 210,
+          right: 20,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.my_location_rounded, color: AppColors.brandRed, size: 16),
+                SizedBox(width: 6),
+                Text(
+                  'Current location',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.gray800),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Top Floating Search Bar with Back Button
+        Positioned(
+          top: 50,
+          left: 16,
+          right: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10),
+              ],
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.gray700),
+                  onPressed: _goBack,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    _searchCtrl.text.isNotEmpty ? _searchCtrl.text : 'Search an area or address',
+                    style: const TextStyle(color: AppColors.gray500, fontSize: 13.5),
+                  ),
+                ),
+                const Icon(Icons.search_rounded, color: AppColors.gray400, size: 20),
+              ],
+            ),
+          ),
+        ),
+
+        // Bottom Address Confirmation Card
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              boxShadow: [
+                BoxShadow(color: Colors.black12, blurRadius: 12),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle text
+                const Text(
+                  'Place the pin at exact delivery location',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.gray500),
+                ),
+                const SizedBox(height: 14),
+
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_rounded, color: AppColors.brandRed, size: 24),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _currentLocationTitle,
+                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.gray900),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _currentSubAddress,
+                            style: const TextStyle(fontSize: 12, color: AppColors.gray600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _step = _LocationStep.addressDetails;
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.brandRed,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                      textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                    ),
+                    child: const Text('Confirm & proceed'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── STATES 5, 6, 7 & 8: Address Details / Save As Selection (Fixed Header + Scrollable Form) ─
+  Widget _buildAddressDetailsState(BuildContext context, AppState appState) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Stack(
+      children: [
+        // Fixed Map Preview Header (160px height)
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 160,
+          child: Container(
+            color: const Color(0xFFE5E7EB),
+            child: Stack(
+              children: [
+                CustomPaint(
+                  size: Size.infinite,
+                  painter: _MapGridPainter(),
+                ),
+                Positioned(
+                  top: 44,
+                  left: 16,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    radius: 18,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.gray800),
+                      onPressed: _goBack,
+                    ),
+                  ),
+                ),
+                const Center(
+                  child: Icon(
+                    Icons.location_on_rounded,
+                    color: AppColors.brandRed,
+                    size: 36,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Scrollable White Form Card pinned beneath map header (overlapping top map by 24px)
+        Positioned.fill(
+          top: 136,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              boxShadow: [
+                BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -4)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 32 + (bottomInset > 0 ? bottomInset : 0)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Address Header
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.location_on_rounded, color: AppColors.brandRed, size: 24),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _currentLocationTitle,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.gray900,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _currentSubAddress,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.gray600,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Yellow Informational Notice
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFD97706)),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'A detailed address will help your delivery partner reach your doorstep easily.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF92400E),
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // HOUSE / FLAT / BLOCK NO.
+                    const Text(
+                      'HOUSE / FLAT / BLOCK NO.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gray500,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _flatCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Flat 200',
+                        hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 13.5),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: AppColors.gray300),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // APARTMENT / ROAD / AREA (RECOMMENDED)
+                    const Text(
+                      'APARTMENT / ROAD / AREA (RECOMMENDED)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gray500,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _areaCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Lakshmi Residency, Road No. 4',
+                        hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 13.5),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: AppColors.gray300),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Save as options
+                    const Text(
+                      'Save as',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.gray600,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Horizontal scrolling row for save-as pills without text shrinking
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          _buildSaveAsPill('Home', Icons.home_rounded),
+                          const SizedBox(width: 8),
+                          _buildSaveAsPill('Friend and Family', Icons.people_alt_rounded),
+                          const SizedBox(width: 8),
+                          _buildSaveAsPill('Others', Icons.location_on_rounded),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Receiver details (Shown when Friend and Family or Others is selected)
+                    if (_selectedTag == 'Others' || _selectedTag == 'Friend and Family') ...[
+                      const Text(
+                        "Receiver's Name",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.gray500,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _receiverNameCtrl,
+                        decoration: InputDecoration(
+                          hintText: "e.g. Receiver's Name",
+                          hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 13.5),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: AppColors.gray300),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        "Receiver's Phone No.",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.gray500,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _receiverPhoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          hintText: "e.g. 9876543210",
+                          hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 13.5),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: AppColors.gray300),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // Save & proceed button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => _saveAndProceed(appState),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.brandRed,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
+                        child: const Text('Save & proceed'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSaveAsPill(String tag, IconData icon) {
+    final isSelected = _selectedTag == tag;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedTag = tag;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.brandRed : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.brandRed : AppColors.gray300,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : AppColors.gray600,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              tag,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? Colors.white : AppColors.gray700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// CustomPainter for styled vector grid map representation
+class _MapGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bgPaint = Paint()..color = const Color(0xFFEAECEE);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
+
+    final roadPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 14
+      ..style = PaintingStyle.stroke;
+
+    final roadBorderPaint = Paint()
+      ..color = const Color(0xFFD1D5DB)
+      ..strokeWidth = 16
+      ..style = PaintingStyle.stroke;
+
+    // Roads
+    final path = Path()
+      ..moveTo(0, size.height * 0.3)
+      ..lineTo(size.width, size.height * 0.4)
+      ..moveTo(size.width * 0.4, 0)
+      ..lineTo(size.width * 0.6, size.height)
+      ..moveTo(0, size.height * 0.75)
+      ..lineTo(size.width, size.height * 0.7);
+
+    canvas.drawPath(path, roadBorderPaint);
+    canvas.drawPath(path, roadPaint);
+
+    // Land blocks
+    final landPaint = Paint()..color = const Color(0xFFDCFCE7).withValues(alpha: 0.6);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.1, size.height * 0.1, size.width * 0.25, size.height * 0.15),
+        const Radius.circular(8),
+      ),
+      landPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

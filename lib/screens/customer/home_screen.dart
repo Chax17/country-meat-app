@@ -325,49 +325,6 @@ class _CustHomeScreenState extends State<CustHomeScreen> {
                 .toList(),
           ),
         ),
-
-        // ── Why Choose Us? ───────────────────────────────────────────────────
-        const _SectionHeader(title: 'Why Choose Us?'),
-        SizedBox(
-          height: 195,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _whyChooseUsImages.length,
-            itemBuilder: (context, index) {
-              final imgPath = _whyChooseUsImages[index];
-              return Container(
-                width: 275,
-                margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Image.asset(
-                    imgPath,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: AppColors.gray100,
-                      child: const Center(
-                        child: Icon(Icons.verified_user_rounded,
-                            color: AppColors.brandRed, size: 32),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-
         // ── Kadaknath Highlight ───────────────────────────────────────────────
         GestureDetector(
           onTap: () => widget.nav('detail', param: 'kadaknath'),
@@ -440,6 +397,50 @@ class _CustHomeScreenState extends State<CustHomeScreen> {
             ),
           ),
         ),
+
+        // ── Why Choose Us? ───────────────────────────────────────────────────
+        const _SectionHeader(title: 'Why Choose Us?'),
+        SizedBox(
+          height: 180,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _whyChooseUsImages.length,
+            itemBuilder: (context, index) {
+              final imgPath = _whyChooseUsImages[index];
+              return Container(
+                width: 275,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    imgPath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: AppColors.gray100,
+                      child: const Center(
+                        child: Icon(Icons.verified_user_rounded,
+                            color: AppColors.brandRed, size: 32),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+
+
 
         // ── Testimonials ────────────────────────────────────────────────────
         _SectionHeader(title: 'What Customers Say'),

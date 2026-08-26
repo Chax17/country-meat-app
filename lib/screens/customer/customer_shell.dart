@@ -17,6 +17,20 @@ import 'widgets/product_cards.dart';
 
 enum CustomerAuthStep { splash, onboarding, login, otp, location, done }
 
+class _NavHistoryItem {
+  final CustomerAuthStep authStep;
+  final String screen;
+  final String? param;
+  final int navIndex;
+
+  const _NavHistoryItem({
+    required this.authStep,
+    required this.screen,
+    this.param,
+    required this.navIndex,
+  });
+}
+
 class CustomerShell extends StatefulWidget {
   final CustomerAuthStep initialAuthStep;
   const CustomerShell({super.key, this.initialAuthStep = CustomerAuthStep.splash});
@@ -35,13 +49,45 @@ class _CustomerShellState extends State<CustomerShell> {
   String _screen = 'home';
   String? _param;
 
+  // ── History Stack ────────────────────────────────────────────────────────
+  final List<_NavHistoryItem> _history = [];
+
   @override
   void initState() {
     super.initState();
     _authStep = widget.initialAuthStep;
   }
 
+  void _pushHistory() {
+    if (_history.isNotEmpty) {
+      final top = _history.last;
+      if (top.authStep == _authStep &&
+          top.screen == _screen &&
+          top.param == _param &&
+          top.navIndex == _navIndex) {
+        return;
+      }
+    }
+    _history.add(_NavHistoryItem(
+      authStep: _authStep,
+      screen: _screen,
+      param: _param,
+      navIndex: _navIndex,
+    ));
+  }
+
   void _nav(String screen, {String? param}) {
+    if (_authStep == CustomerAuthStep.done && _screen == screen && _param == param) {
+      return;
+    }
+
+    // Handle checkout completion: do not allow back to return to payment or cart
+    if (screen == 'confirmation' || screen == 'tracking') {
+      _history.removeWhere((item) => item.screen == 'payment' || item.screen == 'cart');
+    }
+
+    _pushHistory();
+
     setState(() {
       _screen = screen;
       _param = param;
@@ -61,14 +107,25 @@ class _CustomerShellState extends State<CustomerShell> {
   }
 
   void _onNavTap(int idx) {
+    String targetScreen = 'home';
+    switch (idx) {
+      case 0: targetScreen = 'home'; break;
+      case 1: targetScreen = 'categories'; break;
+      case 2: targetScreen = 'orders'; break;
+      case 3: targetScreen = 'profile'; break;
+    }
+
+    if (_navIndex == idx && _screen == targetScreen && _param == null) {
+      return;
+    }
+
+    // Entering a primary root tab: clear sub-screen history to prevent back loops
+    _history.clear();
+
     setState(() {
       _navIndex = idx;
-      switch (idx) {
-        case 0: _screen = 'home'; _param = null; break;
-        case 1: _screen = 'categories'; _param = null; break;
-        case 2: _screen = 'orders'; _param = null; break;
-        case 3: _screen = 'profile'; _param = null; break;
-      }
+      _screen = targetScreen;
+      _param = null;
     });
   }
 
@@ -89,147 +146,140 @@ class _CustomerShellState extends State<CustomerShell> {
 
   @override
   Widget build(BuildContext context) {
+    Widget content;
+
     // ── Auth Flow ────────────────────────────────────────────────────────
     if (_authStep == CustomerAuthStep.splash) {
-      return CustSplashScreen(
+      content = CustSplashScreen(
         onDone: () {
           final isLoggedIn = context.read<AppState>().isLoggedIn;
+          _history.clear();
           setState(() {
             _authStep = isLoggedIn ? CustomerAuthStep.done : CustomerAuthStep.onboarding;
           });
         },
       );
-    }
-    if (_authStep == CustomerAuthStep.onboarding) {
-      return CustOnboardingScreen(
-        onDone: () => setState(() => _authStep = CustomerAuthStep.login),
-      );
-    }
-    if (_authStep == CustomerAuthStep.login) {
-      return PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, result) {
-          if (didPop) return;
-          setState(() {
-            _authStep = CustomerAuthStep.onboarding;
-          });
+    } else if (_authStep == CustomerAuthStep.onboarding) {
+      content = CustOnboardingScreen(
+        onDone: () {
+          _pushHistory();
+          setState(() => _authStep = CustomerAuthStep.login);
         },
-        child: CustLoginScreen(
-          onContinue: (phone) {
-            setState(() {
-              _userPhone = phone;
-              _authStep = CustomerAuthStep.otp;
-            });
-          },
-        ),
       );
-    }
-    if (_authStep == CustomerAuthStep.otp) {
-      return PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, result) {
-          if (didPop) return;
+    } else if (_authStep == CustomerAuthStep.login) {
+      content = CustLoginScreen(
+        onContinue: (phone) {
+          _pushHistory();
           setState(() {
-            _authStep = CustomerAuthStep.login;
-          });
-        },
-        child: CustOtpScreen(
-          phone: _userPhone,
-          onContinue: () {
-            context.read<AppState>().updateUser('Arjun Kumar', '+91 $_userPhone');
-            setState(() => _authStep = CustomerAuthStep.location);
-          },
-        ),
-      );
-    }
-    if (_authStep == CustomerAuthStep.location) {
-      return PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, result) {
-          if (didPop) return;
-          setState(() {
+            _userPhone = phone;
             _authStep = CustomerAuthStep.otp;
           });
         },
-        child: CustLocationScreen(
-          onContinue: () => setState(() => _authStep = CustomerAuthStep.done),
-        ),
       );
-    }
-
-    // ── Main App ─────────────────────────────────────────────────────────
-    final appState = context.watch<AppState>();
-
-    // Full-screen overlays (no bottom nav)
-    if (_screen == 'confirmation') {
-      return CustConfirmationScreen(nav: _nav);
-    }
-    if (_screen == 'tracking') {
-      return CustTrackingScreen(
-        orderId: _param ?? (appState.orders.isNotEmpty ? appState.orders.first.id : ''),
-        nav: _nav,
-      );
-    }
-    if (_screen == 'payment') {
-      return Scaffold(
-        backgroundColor: AppColors.white,
-        body: SafeArea(child: CustPaymentScreen(nav: _nav)),
-      );
-    }
-
-    Widget body;
-    switch (_screen) {
-      case 'home':
-        body = CustHomeScreen(nav: _nav);
-        break;
-      case 'categories':
-        body = CustCategoriesScreen(nav: _nav);
-        break;
-      case 'listing':
-        body = CustListingScreen(category: _param ?? 'chicken', nav: _nav);
-        break;
-      case 'detail':
-        body = CustDetailScreen(
-          productId: _param ?? kAllProducts.first.id,
-          nav: _nav,
-          openModal: _openAddToCart,
-        );
-        break;
-      case 'cart':
-        body = CustCartScreen(nav: _nav);
-        break;
-      case 'orders':
-        body = CustOrdersScreen(nav: _nav);
-        break;
-      case 'rewards':
-        body = CustRewardsScreen(nav: _nav);
-        break;
-      case 'profile':
-        body = CustProfileScreen(nav: _nav);
-        break;
-      case 'addcard':
-        body = CustAddCardScreen(nav: _nav);
-        break;
-      case 'search':
-        body = CustSearchScreen(nav: _nav, initialQuery: _param);
-        break;
-      default:
-        body = CustHomeScreen(nav: _nav);
-    }
-
-    return Scaffold(
-      backgroundColor: AppColors.white,
-      body: SafeArea(child: body),
-      bottomNavigationBar: _BottomNav(
-        currentIndex: _navIndex,
-        cartCount: appState.cartCount,
-        onTap: (i) {
-          _onNavTap(i);
+    } else if (_authStep == CustomerAuthStep.otp) {
+      content = CustOtpScreen(
+        phone: _userPhone,
+        onContinue: () {
+          _pushHistory();
+          context.read<AppState>().updateUser('Arjun Kumar', '+91 $_userPhone');
+          setState(() => _authStep = CustomerAuthStep.location);
         },
-        onCartTap: () => setState(() {
-          _screen = 'cart';
-        }),
-      ),
+      );
+    } else if (_authStep == CustomerAuthStep.location) {
+      content = CustLocationScreen(
+        onContinue: () {
+          _history.clear();
+          setState(() => _authStep = CustomerAuthStep.done);
+        },
+      );
+    } else {
+      // ── Main App ─────────────────────────────────────────────────────────
+      final appState = context.watch<AppState>();
+
+      // Full-screen overlays (no bottom nav)
+      if (_screen == 'confirmation') {
+        content = CustConfirmationScreen(nav: _nav);
+      } else if (_screen == 'tracking') {
+        content = CustTrackingScreen(
+          orderId: _param ?? (appState.orders.isNotEmpty ? appState.orders.first.id : ''),
+          nav: _nav,
+        );
+      } else if (_screen == 'payment') {
+        content = Scaffold(
+          backgroundColor: AppColors.white,
+          body: SafeArea(child: CustPaymentScreen(nav: _nav)),
+        );
+      } else {
+        Widget body;
+        switch (_screen) {
+          case 'home':
+            body = CustHomeScreen(nav: _nav);
+            break;
+          case 'categories':
+            body = CustCategoriesScreen(nav: _nav);
+            break;
+          case 'listing':
+            body = CustListingScreen(category: _param ?? 'chicken', nav: _nav);
+            break;
+          case 'detail':
+            body = CustDetailScreen(
+              productId: _param ?? kAllProducts.first.id,
+              nav: _nav,
+              openModal: _openAddToCart,
+            );
+            break;
+          case 'cart':
+            body = CustCartScreen(nav: _nav);
+            break;
+          case 'orders':
+            body = CustOrdersScreen(nav: _nav);
+            break;
+          case 'rewards':
+            body = CustRewardsScreen(nav: _nav);
+            break;
+          case 'profile':
+            body = CustProfileScreen(nav: _nav);
+            break;
+          case 'addcard':
+            body = CustAddCardScreen(nav: _nav);
+            break;
+          case 'search':
+            body = CustSearchScreen(nav: _nav, initialQuery: _param);
+            break;
+          default:
+            body = CustHomeScreen(nav: _nav);
+        }
+
+        content = Scaffold(
+          backgroundColor: AppColors.white,
+          body: SafeArea(child: body),
+          bottomNavigationBar: _BottomNav(
+            currentIndex: _navIndex,
+            cartCount: appState.cartCount,
+            onTap: (i) {
+              _onNavTap(i);
+            },
+            onCartTap: () => _nav('cart'),
+          ),
+        );
+      }
+    }
+
+    return PopScope(
+      canPop: _history.isEmpty,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_history.isNotEmpty) {
+          final previous = _history.removeLast();
+          setState(() {
+            _authStep = previous.authStep;
+            _screen = previous.screen;
+            _param = previous.param;
+            _navIndex = previous.navIndex;
+          });
+        }
+      },
+      child: content,
     );
   }
 }

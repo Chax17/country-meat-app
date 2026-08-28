@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../constants/payment_assets.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 
@@ -39,7 +40,7 @@ class _CustCartScreenState extends State<CustCartScreen> {
           padding: const EdgeInsets.fromLTRB(4, 10, 16, 6),
           child: Row(children: [
             IconButton(
-              onPressed: () => widget.nav('home'),
+              onPressed: () => widget.nav('back'),
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
             ),
             const Expanded(
@@ -166,7 +167,7 @@ class _CustCartScreenState extends State<CustCartScreen> {
                     label: 'Delivery Address',
                     val: appState.defaultAddress,
                     action: 'Change',
-                    onAction: () => _showAddressPickerSheet(context, appState)),
+                    onAction: () => widget.nav('location', param: 'fromCart')),
                 const SizedBox(height: 8),
                 _InfoRow(
                     icon: '🚚',
@@ -494,7 +495,7 @@ class _CustPaymentScreenState extends State<CustPaymentScreen> {
                       child: const Text('🐓', style: TextStyle(fontSize: 22)),
                     ),
                     title: 'Country Meat Wallet',
-                    subtitle: 'Fastest 1-click checkout experience',
+                    subtitle: 'Available Balance: ₹${appState.walletBalance.toStringAsFixed(2)}',
                     badgeWidget: Container(
                       margin: const EdgeInsets.only(top: 8),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -515,7 +516,7 @@ class _CustPaymentScreenState extends State<CustPaymentScreen> {
                     id: 'phonepe',
                     selectedId: _selectedPaymentOption,
                     onTap: () => setState(() => _selectedPaymentOption = 'phonepe'),
-                    iconWidget: _buildAppLogo('पे', const Color(0xFF5F259F)),
+                    iconWidget: _buildOfficialLogoContainer('phonepe'),
                     title: 'PhonePe UPI',
                     subtitle: 'Pay instantly using PhonePe',
                   ),
@@ -523,7 +524,7 @@ class _CustPaymentScreenState extends State<CustPaymentScreen> {
                     id: 'gpay',
                     selectedId: _selectedPaymentOption,
                     onTap: () => setState(() => _selectedPaymentOption = 'gpay'),
-                    iconWidget: _buildAppLogo('G', const Color(0xFF4285F4)),
+                    iconWidget: _buildOfficialLogoContainer('gpay'),
                     title: 'Google Pay UPI',
                     subtitle: 'Pay securely using Google Pay',
                   ),
@@ -531,29 +532,21 @@ class _CustPaymentScreenState extends State<CustPaymentScreen> {
                     id: 'slice',
                     selectedId: _selectedPaymentOption,
                     onTap: () => setState(() => _selectedPaymentOption = 'slice'),
-                    iconWidget: _buildAppLogo('slice', const Color(0xFF8B5CF6), isText: true),
+                    iconWidget: _buildOfficialLogoContainer('slice'),
                     title: 'Slice Pay UPI',
                   ),
                   _SelectablePaymentCard(
                     id: 'whatsapp',
                     selectedId: _selectedPaymentOption,
                     onTap: () => setState(() => _selectedPaymentOption = 'whatsapp'),
-                    iconWidget: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF25D366),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 22),
-                    ),
+                    iconWidget: _buildOfficialLogoContainer('whatsapp'),
                     title: 'WhatsApp Pay UPI',
                   ),
                   _SelectablePaymentCard(
                     id: 'amazon',
                     selectedId: _selectedPaymentOption,
                     onTap: () => setState(() => _selectedPaymentOption = 'amazon'),
-                    iconWidget: _buildAppLogo('pay', const Color(0xFF232F3E), isText: true),
+                    iconWidget: _buildOfficialLogoContainer('amazon'),
                     title: 'Amazon Pay UPI',
                   ),
 
@@ -583,15 +576,7 @@ class _CustPaymentScreenState extends State<CustPaymentScreen> {
                           children: [
                             Row(
                               children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF3F4F6),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(Icons.add_card_rounded, color: AppColors.gray700, size: 20),
-                                ),
+                                _buildOfficialLogoContainer('upi'),
                                 const SizedBox(width: 14),
                                 const Expanded(
                                   child: Text(
@@ -734,6 +719,21 @@ class _CustPaymentScreenState extends State<CustPaymentScreen> {
           fontSize: isText ? 11 : 16,
         ),
       ),
+    );
+  }
+
+  Widget _buildOfficialLogoContainer(String brandKey) {
+    return Container(
+      width: 40,
+      height: 40,
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      alignment: Alignment.center,
+      child: PaymentAssets.buildLogo(brandKey, height: 24),
     );
   }
 

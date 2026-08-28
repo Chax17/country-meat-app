@@ -3,8 +3,50 @@ import '../models/product.dart';
 import '../data/mock_data.dart';
 import '../services/firebase_service.dart';
 
+import '../models/wallet_transaction.dart';
+
 class AppState extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
+
+  // ── Wallet State ──────────────────────────────────────────────────────────
+  double walletBalance = 0.0;
+  List<WalletTransaction> walletTransactions = [];
+
+  List<WalletTransaction> get recentWalletTransactions => walletTransactions.take(5).toList();
+
+  void addWalletMoney(double amount, {String reference = ''}) {
+    if (amount <= 0) return;
+    final txn = WalletTransaction(
+      id: 'WTXN${DateTime.now().millisecondsSinceEpoch}',
+      amount: amount,
+      type: WalletTransactionType.credit,
+      title: 'Money Added to Wallet',
+      date: DateTime.now(),
+      status: WalletTransactionStatus.success,
+      reference: reference.isNotEmpty ? reference : 'MOCK_PG_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+    );
+    walletBalance += amount;
+    walletTransactions.insert(0, txn);
+    notifyListeners();
+    _syncUserToFirestore();
+  }
+
+  void debitWalletMoney(double amount, {required String orderId}) {
+    if (amount <= 0 || walletBalance < amount) return;
+    final txn = WalletTransaction(
+      id: 'WTXN${DateTime.now().millisecondsSinceEpoch}',
+      amount: amount,
+      type: WalletTransactionType.debit,
+      title: 'Paid for Order #$orderId',
+      date: DateTime.now(),
+      status: WalletTransactionStatus.success,
+      reference: 'ORD_$orderId',
+    );
+    walletBalance -= amount;
+    walletTransactions.insert(0, txn);
+    notifyListeners();
+    _syncUserToFirestore();
+  }
 
   AppState() {
     _initFirebase();
@@ -89,6 +131,24 @@ class AppState extends ChangeNotifier {
     );
     orders.insert(0, newOrder);
     rewardPoints += newOrder.points;
+
+    // Automatically debit wallet balance if paying with Country Meat Wallet
+    if ((paymentMethod.contains('Wallet') || paymentMethod == 'cm_wallet') && walletBalance >= orderTotal) {
+      walletBalance -= orderTotal.toDouble();
+      walletTransactions.insert(
+        0,
+        WalletTransaction(
+          id: 'WTXN${DateTime.now().millisecondsSinceEpoch}',
+          amount: orderTotal.toDouble(),
+          type: WalletTransactionType.debit,
+          title: 'Paid for Order #${newOrder.id}',
+          date: DateTime.now(),
+          status: WalletTransactionStatus.success,
+          reference: 'ORD_${newOrder.id}',
+        ),
+      );
+    }
+
     clearCart();
     lastOrderId = newOrder.id;
     notifyListeners();
@@ -144,6 +204,7 @@ class AppState extends ChangeNotifier {
   // ── Rewards ───────────────────────────────────────────────────────────────
   int rewardPoints = 320;
   bool isRewardRedeemed = false;
+  bool rewardsTermsAccepted = false;
 
   int get rewardDiscount => isRewardRedeemed ? ((rewardPoints / 100).floor() * 10) : 0;
 
@@ -152,16 +213,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void acceptRewardsTerms() {
+    rewardsTermsAccepted = true;
+    notifyListeners();
+  }
+
   String get rewardTier {
     if (rewardPoints >= 1000) return 'Platinum';
+    if (rewardPoints >= 750) return 'Diamond';
     if (rewardPoints >= 500) return 'Gold';
-    return 'Silver';
+    if (rewardPoints >= 250) return 'Silver';
+    return 'Bronze';
   }
 
   int get nextTierPoints {
     if (rewardPoints >= 1000) return 0;
-    if (rewardPoints >= 500) return 1000 - rewardPoints;
-    return 500 - rewardPoints;
+    if (rewardPoints >= 750) return 1000 - rewardPoints;
+    if (rewardPoints >= 500) return 750 - rewardPoints;
+    if (rewardPoints >= 250) return 500 - rewardPoints;
+    return 250 - rewardPoints;
   }
 
   // ── User / Auth ───────────────────────────────────────────────────────────
@@ -169,6 +239,17 @@ class AppState extends ChangeNotifier {
   String userName = 'Arjun Kumar';
   String userPhone = '+91 98765 43210';
   String selectedSlot = '6AM–9AM';
+  String? userBirthday;
+
+  bool get isBirthdaySet => userBirthday != null && userBirthday!.isNotEmpty;
+
+  void setBirthday(String birthday) {
+    if (!isBirthdaySet && birthday.isNotEmpty) {
+      userBirthday = birthday;
+      notifyListeners();
+      _syncUserToFirestore();
+    }
+  }
 
   List<SavedAddress> addresses = const [
     SavedAddress(label: 'Home', address: 'Basaveshwara Nagar, Hebbal 1st Stage, Mysore', isDefault: true),

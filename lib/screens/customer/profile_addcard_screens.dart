@@ -5,9 +5,27 @@ import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 
 // ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
-class CustProfileScreen extends StatelessWidget {
+class CustProfileScreen extends StatefulWidget {
   final void Function(String screen, {String? param}) nav;
-  const CustProfileScreen({super.key, required this.nav});
+  final String? param;
+  const CustProfileScreen({super.key, required this.nav, this.param});
+
+  @override
+  State<CustProfileScreen> createState() => _CustProfileScreenState();
+}
+
+class _CustProfileScreenState extends State<CustProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.param == 'addresses' || widget.param == 'showAddressesSheet') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showAddressesSheet(context, context.read<AppState>());
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +33,7 @@ class CustProfileScreen extends StatelessWidget {
 
     return Column(
       children: [
-        _CircleNavHeader(title: 'My Profile', onBack: () => nav('home')),
+        _CircleNavHeader(title: 'My Profile', onBack: () => widget.nav('home')),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -182,21 +200,21 @@ class CustProfileScreen extends StatelessWidget {
                     icon: Icons.shopping_bag_outlined,
                     label: 'Orders',
                     value: '${appState.orders.length}',
-                    onTap: () => nav('orders'),
+                    onTap: () => widget.nav('orders'),
                   ),
                   const SizedBox(width: 10),
                   _QuickStatCard(
                     icon: Icons.stars_rounded,
                     label: 'Rewards',
                     value: '${appState.rewardPoints} pts',
-                    onTap: () => nav('rewards'),
+                    onTap: () => widget.nav('rewards'),
                   ),
                   const SizedBox(width: 10),
                   _QuickStatCard(
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Wallet',
-                    value: '₹${appState.rewardPoints}',
-                    onTap: () => nav('addcard'),
+                    value: '₹${appState.walletBalance.toStringAsFixed(0)}',
+                    onTap: () => widget.nav('wallet'),
                   ),
                 ],
               ),
@@ -224,15 +242,15 @@ class CustProfileScreen extends StatelessWidget {
                     _ProfileMenuItem(
                       icon: Icons.account_balance_wallet_outlined,
                       title: 'Country Meat Wallet',
-                      sub: 'Cash+ Balance: ₹${appState.rewardPoints}',
-                      onTap: () => nav('addcard'),
+                      sub: 'Balance: ₹${appState.walletBalance.toStringAsFixed(2)}',
+                      onTap: () => widget.nav('wallet'),
                     ),
                     const Divider(height: 1, color: Color(0xFFF3F4F6)),
                     _ProfileMenuItem(
                       icon: Icons.emoji_events_outlined,
                       title: 'Loyalty & Rewards',
                       sub: 'Milestones, badges & coupons',
-                      onTap: () => nav('rewards'),
+                      onTap: () => widget.nav('rewards'),
                     ),
                   ],
                 ),
@@ -255,7 +273,7 @@ class CustProfileScreen extends StatelessWidget {
                       icon: Icons.campaign_outlined,
                       title: 'Refer & Earn',
                       sub: 'Invite friends & get 10% OFF coupon',
-                      onTap: () => showAppToast(context, 'Referral link copied to clipboard! 🎁'),
+                      onTap: () => widget.nav('referral'),
                     ),
                     const Divider(height: 1, color: Color(0xFFF3F4F6)),
                     _ProfileMenuItem(
@@ -357,39 +375,61 @@ class CustProfileScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              ...appState.addresses.map((a) => Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: a.isDefault ? AppColors.brandRedBg : AppColors.gray50,
-                  borderRadius: BorderRadius.circular(AppRadius.base),
-                  border: Border.all(color: a.isDefault ? AppColors.brandRed : AppColors.gray200),
-                ),
-                child: Row(
-                  children: [
-                    Text(a.isDefault ? '🏠' : '🏢', style: const TextStyle(fontSize: 20)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(a.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                          Text(a.address, style: const TextStyle(color: AppColors.gray500, fontSize: 11.5)),
-                        ],
+              ...appState.addresses.map((a) => GestureDetector(
+                onTap: () {
+                  appState.setDefaultAddress(a);
+                  showAppToast(context, 'Set as default delivery address! 🏠');
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: a.isDefault ? AppColors.brandRedBg : AppColors.gray50,
+                    borderRadius: BorderRadius.circular(AppRadius.base),
+                    border: Border.all(color: a.isDefault ? AppColors.brandRed : AppColors.gray200),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(a.isDefault ? '🏠' : '🏢', style: const TextStyle(fontSize: 20)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(a.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                if (a.isDefault) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.brandRed,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('DEFAULT', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            Text(a.address, style: const TextStyle(color: AppColors.gray500, fontSize: 11.5)),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               )),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _showAddAddressModal(context, appState);
+                    widget.nav('location', param: 'profileAddress');
                   },
-                  child: const Text('+ Add New Address'),
+                  icon: const Icon(Icons.add_location_alt_rounded, size: 18),
+                  label: const Text('+ Add New Address'),
                 ),
               ),
             ],
@@ -452,75 +492,7 @@ class CustProfileScreen extends StatelessWidget {
     );
   }
 
-  void _showAddAddressModal(BuildContext context, AppState appState) {
-    final labelCtrl = TextEditingController(text: 'Home');
-    final addrCtrl = TextEditingController();
-    bool isDefault = false;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-              top: 20, left: 20, right: 20,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Add New Address',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: labelCtrl,
-                  decoration: const InputDecoration(labelText: 'Label (e.g. Home, Work)', prefixIcon: Icon(Icons.label_rounded)),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: addrCtrl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'Full Address', prefixIcon: Icon(Icons.location_on_rounded)),
-                ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Set as default delivery address', style: TextStyle(fontSize: 13)),
-                  value: isDefault,
-                  onChanged: (v) => setModalState(() => isDefault = v ?? false),
-                  activeColor: AppColors.brandRed,
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (addrCtrl.text.isNotEmpty) {
-                        appState.addAddress(SavedAddress(
-                          label: labelCtrl.text.isEmpty ? 'Home' : labelCtrl.text,
-                          address: addrCtrl.text,
-                          isDefault: isDefault,
-                        ));
-                        Navigator.pop(ctx);
-                        showAppToast(context, 'Address added! 🏠');
-                      }
-                    },
-                    child: const Text('Save Address'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   void _showNotificationSettingsModal(BuildContext context) {
     bool orderUpdates = true;
@@ -803,7 +775,7 @@ class CustAddCardScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(4, 10, 16, 6),
           child: Row(children: [
             IconButton(
-              onPressed: () => nav('profile'),
+              onPressed: () => nav('back'),
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
             ),
             const Text('Saved Cards',

@@ -3,10 +3,14 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:latlong2/latlong.dart';
 import '../../models/product.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_map_widget.dart';
+import '../../data/mock_location_data.dart';
 import 'home_screen.dart';
+import 'profile_addcard_screens.dart';
 
 // ─── SPLASH ──────────────────────────────────────────────────────────────────
 // Design: Two distinct Figma splash states with a simple cross-fade transition
@@ -877,19 +881,33 @@ enum _LocationStep {
   addressDetails,
 }
 
+enum LocationOrigin { onboarding, cart, profileAddress, homeAddress }
+
 class CustLocationScreen extends StatefulWidget {
+  final LocationOrigin origin;
   final VoidCallback onContinue;
-  const CustLocationScreen({super.key, required this.onContinue});
+  final bool fromCart;
+  final VoidCallback? onBack;
+
+  const CustLocationScreen({
+    super.key,
+    this.origin = LocationOrigin.onboarding,
+    required this.onContinue,
+    this.fromCart = false,
+    this.onBack,
+  });
 
   @override
   State<CustLocationScreen> createState() => _CustLocationScreenState();
 }
 
 class _CustLocationScreenState extends State<CustLocationScreen> {
-  _LocationStep _step = _LocationStep.initial;
+  late _LocationStep _step;
+  _LocationStep? _previousStep;
   String _selectedTag = 'Home'; // 'Home', 'Friend and Family', 'Others'
   String _currentLocationTitle = 'HSR Layout';
   String _currentSubAddress = 'HSR Layout, Gowtham PG, Bengaluru, Karnataka, India';
+  LatLng _selectedLatLng = MockLocationData.customerLocation;
 
   late final TextEditingController _flatCtrl;
   late final TextEditingController _areaCtrl;
@@ -900,6 +918,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
   @override
   void initState() {
     super.initState();
+    _step = widget.fromCart ? _LocationStep.selectLocation : _LocationStep.initial;
     _flatCtrl = TextEditingController();
     _areaCtrl = TextEditingController();
     _receiverNameCtrl = TextEditingController();
@@ -920,11 +939,19 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
   void _goBack() {
     setState(() {
       if (_step == _LocationStep.addressDetails) {
-        _step = _LocationStep.map;
-      } else if (_step == _LocationStep.map || _step == _LocationStep.search) {
-        _step = _LocationStep.selectLocation;
+        _step = _previousStep ?? _LocationStep.map;
+      } else if (_step == _LocationStep.map) {
+        _step = _LocationStep.search;
+      } else if (_step == _LocationStep.search) {
+        _step = widget.fromCart ? _LocationStep.selectLocation : _LocationStep.initial;
       } else if (_step == _LocationStep.selectLocation) {
-        _step = _LocationStep.initial;
+        if (widget.fromCart) {
+          widget.onBack?.call();
+        } else {
+          _step = _LocationStep.initial;
+        }
+      } else if (_step == _LocationStep.initial) {
+        widget.onBack?.call();
       }
     });
   }
@@ -962,7 +989,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
     final appState = context.watch<AppState>();
 
     return PopScope(
-      canPop: _step == _LocationStep.initial,
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         _goBack();
@@ -991,15 +1018,17 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
 
   // ── STATE 1: Choose Your Location Modal over dimmed & blurred Home background ────────
   Widget _buildInitialState(BuildContext context, AppState appState) {
+    final Widget bgScreen = widget.origin == LocationOrigin.profileAddress
+        ? CustProfileScreen(nav: (r, {param}) {})
+        : CustHomeScreen(nav: (r, {param}) {});
+
     return Stack(
       children: [
-        // Real CustHomeScreen underlying background (gestures absorbed)
+        // Real underlying background (gestures absorbed)
         Positioned.fill(
           child: AbsorbPointer(
             absorbing: true,
-            child: CustHomeScreen(
-              nav: (route, {param}) {},
-            ),
+            child: bgScreen,
           ),
         ),
 
@@ -1074,7 +1103,12 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      _saveAndProceed(appState);
+                      setState(() {
+                        _currentLocationTitle = 'HSR Layout';
+                        _currentSubAddress = 'HSR Layout, Gowtham PG, Bengaluru, Karnataka, India';
+                        _previousStep = _LocationStep.initial;
+                        _step = _LocationStep.addressDetails;
+                      });
                     },
                     icon: const Icon(Icons.my_location_rounded, size: 18),
                     label: const Text('Use Current Location'),
@@ -1130,208 +1164,263 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
     );
   }
 
-  // ── STATE 2: Select Your Location ──────────────────────────────────────────
+  // ── STATE 2: Saved Address Screen (Figma Aligned) ───────────────────────────
   Widget _buildSelectLocationState(BuildContext context, AppState appState) {
     final savedList = appState.addresses.isEmpty
         ? const [
             SavedAddress(
               label: 'HOME',
-              address: 'Flat 203, Lakshmi Residency, Road No. 4, Banjara Hills, Bangalore, Karnataka - 500034',
+              address: 'Basaveshwara Nagar, Hebbal 1st Stage, Mysore',
               isDefault: true,
             ),
             SavedAddress(
+              label: 'WORK',
+              address: '3rd Floor, Tech Park, Mysore Road, Bangalore',
+            ),
+            SavedAddress(
               label: 'DILIP',
-              address: 'Flat 203, Lakshmi Residency, Road No. 4, Banjara Hills, Bangalore, Karnataka - 500034',
+              address: 'Flat 203, Lakshmi Residency, Road No. 4, Banjara Hills, Bangalore',
             ),
           ]
         : appState.addresses;
 
     return SafeArea(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Top Header (Figma Aligned)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Stack(
-              alignment: Alignment.center,
+            child: Row(
               children: [
-                Align(
-                  alignment: Alignment.centerLeft,
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.gray300),
+                  ),
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.gray800),
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.gray800),
                     onPressed: _goBack,
                   ),
                 ),
-                const Text(
-                  'Select your Location',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.gray900,
+                const Expanded(
+                  child: Text(
+                    'Saved Address',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.gray900,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 36),
               ],
             ),
           ),
 
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Search Bar (White background, light gray border matching Figma)
-                  GestureDetector(
-                    onTap: () {
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              children: [
+                // Search an area or address input trigger
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _step = _LocationStep.search;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      boxShadow: AppShadows.subtle,
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.search_rounded, color: AppColors.brandRed, size: 20),
+                        SizedBox(width: 10),
+                        Text(
+                          'Search an area or address',
+                          style: TextStyle(color: AppColors.gray400, fontSize: 13.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Use Current Location Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
                       setState(() {
-                        _step = _LocationStep.search;
+                        _currentLocationTitle = 'HSR Layout';
+                        _currentSubAddress = 'HSR Layout, Gowtham PG, Bengaluru, Karnataka, India';
+                        _previousStep = _LocationStep.selectLocation;
+                        _step = _LocationStep.addressDetails;
                       });
                     },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
+                    icon: const Icon(Icons.my_location_rounded, size: 18),
+                    label: const Text('Use current location'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.brandRed,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      elevation: 0,
+                      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Saved Address Section Heading
+                const Text(
+                  'Saved Address',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.gray500,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Address Cards List
+                ...savedList.map((addr) {
+                  final isSelected = addr.isDefault || (addr.address == appState.defaultAddress);
+                  final labelUpper = addr.label.toUpperCase();
+                  final IconData cardIcon = labelUpper.contains('HOME')
+                      ? Icons.home_rounded
+                      : labelUpper.contains('WORK')
+                          ? Icons.work_rounded
+                          : Icons.location_on_rounded;
+
+                  return GestureDetector(
+                    onTap: () {
+                      appState.setDefaultAddress(addr);
+                      showAppToast(context, 'Delivery address set to ${addr.label}');
+                      widget.onContinue();
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFFFEF2F2) : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isSelected ? AppColors.brandRed : AppColors.gray200,
+                          width: isSelected ? 1.5 : 1.0,
+                        ),
+                        boxShadow: AppShadows.subtle,
                       ),
                       child: Row(
-                        children: const [
-                          Icon(Icons.search_rounded, color: AppColors.brandRed, size: 20),
-                          SizedBox(width: 10),
-                          Text(
-                            'Search an area or address',
-                            style: TextStyle(color: AppColors.gray400, fontSize: 13.5),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.white : AppColors.gray50,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              cardIcon,
+                              color: isSelected ? AppColors.brandRed : AppColors.gray600,
+                              size: 22,
+                            ),
                           ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      labelUpper,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: isSelected ? AppColors.brandRed : AppColors.gray900,
+                                      ),
+                                    ),
+                                    if (isSelected) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.brandRed,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          'DEFAULT',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  addr.address,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    color: AppColors.gray600,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(Icons.check_circle_rounded, color: AppColors.brandRed, size: 20),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                  );
+                }),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
 
-                  // Use current location button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _step = _LocationStep.addressDetails;
-                        });
-                      },
-                      icon: const Icon(Icons.my_location_rounded, size: 18),
-                      label: const Text('Use current location'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.brandRed,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        elevation: 0,
-                        textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
-                      ),
-                    ),
+          // Pinned Bottom Button: "+ Add new address"
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: AppColors.gray200)),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _step = _LocationStep.search;
+                  });
+                },
+                icon: const Icon(Icons.add_rounded, size: 20, color: AppColors.brandRed),
+                label: const Text('Add new address'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.brandRed,
+                  side: const BorderSide(color: AppColors.brandRed, width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(height: 10),
-
-                  // Add new Address button
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _step = _LocationStep.map;
-                        });
-                      },
-                      icon: const Icon(Icons.add_rounded, size: 20, color: AppColors.brandRed),
-                      label: const Text('Add new Address'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.brandRed,
-                        side: const BorderSide(color: Color(0xFFFCA5A5)),
-                        backgroundColor: const Color(0xFFFEF2F2),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Saved Address Section
-                  const Text(
-                    'Saved Address',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.gray500,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Cards
-                  ...savedList.map((addr) {
-                    final isHome = addr.label.toUpperCase().contains('HOME');
-                    return GestureDetector(
-                      onTap: () {
-                        appState.setDefaultAddress(addr);
-                        widget.onContinue();
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 14),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              isHome ? Icons.home_rounded : Icons.people_alt_rounded,
-                              color: AppColors.gray600,
-                              size: 28,
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    addr.label.toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.gray900,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    addr.address,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.gray600,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Icon(Icons.more_vert_rounded, color: AppColors.gray400, size: 20),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                ],
+                  textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
               ),
             ),
           ),
@@ -1395,6 +1484,9 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
               child: ElevatedButton.icon(
                 onPressed: () {
                   setState(() {
+                    _currentLocationTitle = 'HSR Layout';
+                    _currentSubAddress = 'HSR Layout, Gowtham PG, Bengaluru, Karnataka, India';
+                    _previousStep = _LocationStep.search;
                     _step = _LocationStep.addressDetails;
                   });
                 },
@@ -1431,6 +1523,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
                     setState(() {
                       _currentLocationTitle = s['title']!;
                       _currentSubAddress = '${s['title']!}, ${s['subtitle']!}';
+                      _previousStep = _LocationStep.search;
                       _step = _LocationStep.map;
                     });
                   },
@@ -1447,41 +1540,17 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
   Widget _buildMapState(BuildContext context, AppState appState) {
     return Stack(
       children: [
-        // Stylized vector map background representation
+        // Real interactive map picker taking top area (~50% height)
         Positioned.fill(
-          child: Container(
-            color: const Color(0xFFF3F4F6),
-            child: CustomPaint(
-              painter: _MapGridPainter(),
-            ),
-          ),
-        ),
-
-        // Centered pin marker aligned exactly with center of blue accuracy circle
-        Center(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Blue accuracy circle
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF3B82F6).withValues(alpha: 0.25),
-                  border: Border.all(color: const Color(0xFF3B82F6), width: 2),
-                ),
-              ),
-              // Pin icon positioned so its tip sits right at center
-              Transform.translate(
-                offset: const Offset(0, -21),
-                child: const Icon(
-                  Icons.location_on_rounded,
-                  color: AppColors.brandRed,
-                  size: 42,
-                ),
-              ),
-            ],
+          child: AppMapWidget(
+            mode: AppMapMode.picker,
+            center: _selectedLatLng,
+            zoom: 15.5,
+            onPositionChanged: (newCenter, hasGesture) {
+              if (hasGesture) {
+                _selectedLatLng = newCenter;
+              }
+            },
           ),
         ),
 
@@ -1489,25 +1558,34 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
         Positioned(
           bottom: 210,
           right: 20,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.my_location_rounded, color: AppColors.brandRed, size: 16),
-                SizedBox(width: 6),
-                Text(
-                  'Current location',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.gray800),
-                ),
-              ],
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedLatLng = MockLocationData.customerLocation;
+                _currentLocationTitle = 'HSR Layout';
+                _currentSubAddress = 'HSR Layout, Gowtham PG, Bengaluru, Karnataka, India';
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.my_location_rounded, color: AppColors.brandRed, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Current location',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.gray800),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1599,6 +1677,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       setState(() {
+                        _previousStep = _LocationStep.map;
                         _step = _LocationStep.addressDetails;
                       });
                     },
@@ -1629,7 +1708,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
 
     return Stack(
       children: [
-        // Fixed Map Preview Header (160px height)
+        // Fixed Map Preview Header (160px height) - Tapping opens full Map Selection!
         Positioned(
           top: 0,
           left: 0,
@@ -1639,9 +1718,15 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
             color: const Color(0xFFE5E7EB),
             child: Stack(
               children: [
-                CustomPaint(
-                  size: Size.infinite,
-                  painter: _MapGridPainter(),
+                AppMapWidget(
+                  mode: AppMapMode.preview,
+                  center: _selectedLatLng,
+                  zoom: 15.0,
+                  onTap: () {
+                    setState(() {
+                      _step = _LocationStep.map;
+                    });
+                  },
                 ),
                 Positioned(
                   top: 44,
@@ -1653,13 +1738,6 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
                       icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.gray800),
                       onPressed: _goBack,
                     ),
-                  ),
-                ),
-                const Center(
-                  child: Icon(
-                    Icons.location_on_rounded,
-                    color: AppColors.brandRed,
-                    size: 36,
                   ),
                 ),
               ],
@@ -1944,46 +2022,4 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
   }
 }
 
-// CustomPainter for styled vector grid map representation
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bgPaint = Paint()..color = const Color(0xFFEAECEE);
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
 
-    final roadPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 14
-      ..style = PaintingStyle.stroke;
-
-    final roadBorderPaint = Paint()
-      ..color = const Color(0xFFD1D5DB)
-      ..strokeWidth = 16
-      ..style = PaintingStyle.stroke;
-
-    // Roads
-    final path = Path()
-      ..moveTo(0, size.height * 0.3)
-      ..lineTo(size.width, size.height * 0.4)
-      ..moveTo(size.width * 0.4, 0)
-      ..lineTo(size.width * 0.6, size.height)
-      ..moveTo(0, size.height * 0.75)
-      ..lineTo(size.width, size.height * 0.7);
-
-    canvas.drawPath(path, roadBorderPaint);
-    canvas.drawPath(path, roadPaint);
-
-    // Land blocks
-    final landPaint = Paint()..color = const Color(0xFFDCFCE7).withValues(alpha: 0.6);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width * 0.1, size.height * 0.1, size.width * 0.25, size.height * 0.15),
-        const Radius.circular(8),
-      ),
-      landPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

@@ -78,7 +78,7 @@ class _CustHomeScreenState extends State<CustHomeScreen> {
             children: [
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _showLocationPickerModal(context, appState),
+                  onTap: () => _showLocationPickerModal(context, appState, widget.nav),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -243,7 +243,7 @@ class _CustHomeScreenState extends State<CustHomeScreen> {
                   tag: 'Catch',
                   onTap: () => widget.nav('listing', param: 'seafood')),
               _CatCard(
-                  img: 'assets/images/kadaknath_real.jpg',
+                  img: 'assets/images/k1.jpg',
                   label: 'Kadaknath',
                   itemCount: '3 Items',
                   tag: 'Rare',
@@ -674,10 +674,8 @@ class _Testimonial extends StatelessWidget {
 }
 
 // ─── LOCATION PICKER MODAL ───────────────────────────────────────────────────
-void _showLocationPickerModal(BuildContext context, AppState appState) {
-  final newAddressCtrl = TextEditingController();
-  final newLabelCtrl = TextEditingController(text: 'Other');
-
+void _showLocationPickerModal(
+    BuildContext context, AppState appState, void Function(String screen, {String? param}) nav) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -806,69 +804,16 @@ void _showLocationPickerModal(BuildContext context, AppState appState) {
             }),
             const SizedBox(height: 12),
             const Divider(color: Color(0xFFE5E7EB)),
-            const SizedBox(height: 8),
-            const Text(
-              'Add New Address',
-              style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                  color: AppColors.gray900),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                SizedBox(
-                  width: 90,
-                  child: TextField(
-                    controller: newLabelCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Label',
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 12),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: newAddressCtrl,
-                    decoration: InputDecoration(
-                      hintText: 'Enter address (e.g. Flat 102, Mysore Road)',
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 12),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  final text = newAddressCtrl.text.trim();
-                  final label = newLabelCtrl.text.trim();
-                  if (text.isNotEmpty) {
-                    final newAddr = SavedAddress(
-                      label: label.isNotEmpty ? label : 'Other',
-                      address: text,
-                      isDefault: true,
-                    );
-                    appState.addAddress(newAddr);
-                    appState.setDefaultAddress(newAddr);
-                    Navigator.pop(ctx);
-                    showAppToast(
-                        context, 'New address set as delivery location! 📍');
-                  } else {
-                    showAppToast(context, 'Please enter an address');
-                  }
+                  Navigator.pop(ctx);
+                  nav('location', param: 'homeAddress');
                 },
                 icon: const Icon(Icons.add_location_alt_rounded, size: 18),
-                label: const Text('Save & Set Active Location'),
+                label: const Text('Add New Address'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.brandRed,
                   foregroundColor: Colors.white,

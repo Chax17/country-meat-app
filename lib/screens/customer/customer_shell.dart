@@ -10,7 +10,11 @@ import 'detail_screen.dart';
 import 'cart_payment_screens.dart';
 import 'order_screens.dart';
 import 'rewards_screen.dart';
+import 'tier_progress_screen.dart';
+import 'referral_screen.dart';
+import 'birthday_screen.dart';
 import 'profile_addcard_screens.dart';
+import 'wallet_screen.dart';
 import 'splash_otp_location_screens.dart';
 import 'search_screen.dart';
 import 'widgets/product_cards.dart';
@@ -76,7 +80,30 @@ class _CustomerShellState extends State<CustomerShell> {
     ));
   }
 
+  void _pop() {
+    if (_history.isNotEmpty) {
+      final previous = _history.removeLast();
+      setState(() {
+        _authStep = previous.authStep;
+        _screen = previous.screen;
+        _param = previous.param;
+        _navIndex = previous.navIndex;
+      });
+    } else {
+      setState(() {
+        _screen = 'home';
+        _param = null;
+        _navIndex = 0;
+      });
+    }
+  }
+
   void _nav(String screen, {String? param}) {
+    if (screen == 'back' || screen == 'pop') {
+      _pop();
+      return;
+    }
+
     if (_authStep == CustomerAuthStep.done && _screen == screen && _param == param) {
       return;
     }
@@ -106,8 +133,12 @@ class _CustomerShellState extends State<CustomerShell> {
         case 'tracking':
         case 'confirmation': _navIndex = 2; break;
         case 'rewards':
+        case 'tier_progress':
+        case 'referral':
+        case 'birthday':
         case 'profile':
-        case 'addcard': _navIndex = 3; break;
+        case 'addcard':
+        case 'wallet': _navIndex = 3; break;
       }
     });
   }
@@ -215,6 +246,30 @@ class _CustomerShellState extends State<CustomerShell> {
           backgroundColor: AppColors.white,
           body: SafeArea(child: CustPaymentScreen(nav: _nav)),
         );
+      } else if (_screen == 'location') {
+        final isProfileAddress = _param == 'profileAddress' || _param == 'profile';
+        final isHomeAddress = _param == 'homeAddress' || _param == 'home';
+        final isFromCart = _param == 'cart';
+
+        final LocationOrigin origin;
+        if (isProfileAddress) {
+          origin = LocationOrigin.profileAddress;
+        } else if (isHomeAddress) {
+          origin = LocationOrigin.homeAddress;
+        } else if (isFromCart) {
+          origin = LocationOrigin.cart;
+        } else {
+          origin = LocationOrigin.onboarding;
+        }
+
+        content = CustLocationScreen(
+          origin: origin,
+          fromCart: isFromCart,
+          onContinue: () {
+            _nav('back', param: isProfileAddress ? 'addresses' : null);
+          },
+          onBack: () => _nav('back', param: isProfileAddress ? 'addresses' : null),
+        );
       } else {
         Widget body;
         switch (_screen) {
@@ -243,11 +298,23 @@ class _CustomerShellState extends State<CustomerShell> {
           case 'rewards':
             body = CustRewardsScreen(nav: _nav);
             break;
+          case 'tier_progress':
+            body = CustTierProgressScreen(nav: _nav);
+            break;
+          case 'referral':
+            body = CustReferralScreen(nav: _nav);
+            break;
+          case 'birthday':
+            body = CustBirthdayScreen(nav: _nav);
+            break;
           case 'profile':
-            body = CustProfileScreen(nav: _nav);
+            body = CustProfileScreen(nav: _nav, param: _param);
             break;
           case 'addcard':
             body = CustAddCardScreen(nav: _nav);
+            break;
+          case 'wallet':
+            body = CustWalletScreen(nav: _nav);
             break;
           case 'search':
             body = CustSearchScreen(nav: _nav, initialQuery: _param);
@@ -276,13 +343,7 @@ class _CustomerShellState extends State<CustomerShell> {
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         if (_history.isNotEmpty) {
-          final previous = _history.removeLast();
-          setState(() {
-            _authStep = previous.authStep;
-            _screen = previous.screen;
-            _param = previous.param;
-            _navIndex = previous.navIndex;
-          });
+          _pop();
         }
       },
       child: content,

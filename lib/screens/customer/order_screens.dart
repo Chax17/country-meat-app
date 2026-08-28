@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import '../../models/product.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_map_widget.dart';
+import '../../data/mock_location_data.dart';
 
-// ─── ORDER CONFIRMATION ───────────────────────────────────────────────────────
+// ─── ORDER CONFIRMATION / ORDER STATUS (SCREEN 1) ────────────────────────────
 class CustConfirmationScreen extends StatelessWidget {
   final void Function(String screen, {String? param}) nav;
   const CustConfirmationScreen({super.key, required this.nav});
@@ -16,6 +18,15 @@ class CustConfirmationScreen extends StatelessWidget {
       (o) => o.id == appState.lastOrderId,
       orElse: () => appState.orders.first,
     );
+
+    final statusMessage = switch (order.statusEnum) {
+      OrderStatus.confirmed => 'Your order is being placed',
+      OrderStatus.slaughtering => 'Fresh Desi Bird Preparation',
+      OrderStatus.driverAssigned => 'Delivery Partner Assigned',
+      OrderStatus.outForDelivery => 'On the Way to Your Location',
+      OrderStatus.delivered => 'Order Delivered',
+      OrderStatus.cancelled => 'Order Cancelled',
+    };
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -36,13 +47,13 @@ class CustConfirmationScreen extends StatelessWidget {
                     ),
                     child: IconButton(
                       padding: EdgeInsets.zero,
-                      onPressed: () => nav('home'),
+                      onPressed: () => nav('back'),
                       icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.gray800),
                     ),
                   ),
                   const Expanded(
                     child: Text(
-                      'Order',
+                      'Order Status',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.gray900),
                     ),
@@ -59,10 +70,10 @@ class CustConfirmationScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     const SizedBox(height: 12),
-                    // Confirmation Heading
-                    const Text(
-                      'Your order is being placed',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.gray900),
+                    Text(
+                      statusMessage,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.gray900),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -71,7 +82,7 @@ class CustConfirmationScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
 
-                    // Dynamic Order Lifecycle Progress Timeline Section
+                    // 3-Step Lifecycle Timeline (Confirmed -> Slaughtering -> On the way)
                     _OrderLifecycleTimeline(status: order.statusEnum),
                     const SizedBox(height: 20),
 
@@ -163,25 +174,27 @@ class CustConfirmationScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showCancelDialog(context, appState, order.id),
-                            icon: const Icon(Icons.cancel_outlined, size: 16),
-                            label: const Text('Cancel Order'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.brandRed,
-                              side: const BorderSide(color: AppColors.brandRed),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        if (order.statusEnum == OrderStatus.confirmed || order.statusEnum == OrderStatus.slaughtering) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showCancelDialog(context, appState, order.id),
+                              icon: const Icon(Icons.cancel_outlined, size: 16),
+                              label: const Text('Cancel Order'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.brandRed,
+                                side: const BorderSide(color: AppColors.brandRed),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 16),
 
-                    // Dev State Stepper Pill (Isolated for UI testing during review)
+                    // Dev State Stepper Pill (Isolated for lifecycle testing)
                     InkWell(
                       onTap: () {
                         appState.advanceOrderStatus(order.id);
@@ -214,7 +227,7 @@ class CustConfirmationScreen extends StatelessWidget {
               ),
             ),
 
-            // Fixed Bottom Track Order CTA
+            // Fixed Bottom Track Order CTA Button
             Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               decoration: const BoxDecoration(
@@ -419,7 +432,7 @@ class _TimelineLabelText extends StatelessWidget {
   }
 }
 
-// ─── ORDER TRACKING ───────────────────────────────────────────────────────────
+// ─── LIVE ORDER TRACKING (SCREEN 2) ───────────────────────────────────────────
 class CustTrackingScreen extends StatelessWidget {
   final String orderId;
   final void Function(String screen, {String? param}) nav;
@@ -433,395 +446,410 @@ class CustTrackingScreen extends StatelessWidget {
       orElse: () => appState.orders.first,
     );
 
+    // ── DELIVERED STATE: Remove Map & Show Rating Experience ───────────────
+    if (order.statusEnum == OrderStatus.delivered) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.gray300),
+                      ),
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: () => nav('back'),
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.gray800),
+                      ),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'Order Delivered',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.gray900),
+                      ),
+                    ),
+                    const SizedBox(width: 38),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      _DeliveredStateCard(
+                        order: order,
+                        onRateSubmit: (score, feedback) {
+                          appState.rateOrder(order.id, score, feedback);
+                          showAppToast(context, 'Rating submitted! ⭐ Thank you.');
+                          nav('home');
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Dev State Stepper Pill for testing lifecycle transitions
+                      InkWell(
+                        onTap: () {
+                          appState.advanceOrderStatus(order.id);
+                          showAppToast(context, 'Status updated: ${order.statusEnum.label}');
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.bolt_rounded, size: 14, color: Color(0xFFF59E0B)),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Dev Toggle: ${order.statusEnum.label} (Tap to change)',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.gray700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ── ACTIVE TRACKING STATE: Large Interactive Map & Delivery Sheet ─────────
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _CircleNavHeader(title: 'Order Tracking', onBack: () => nav('orders')),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                children: [
-                  // Dev State Stepper Pill
-                  Center(
-                    child: InkWell(
-                      onTap: () {
-                        appState.advanceOrderStatus(order.id);
-                        showAppToast(context, 'Status updated: ${order.statusEnum.label}');
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF2F2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.brandRed.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final totalHeight = constraints.maxHeight;
+          final mapHeight = totalHeight * 0.58; // Occupies ~58% of viewport
+
+          return Stack(
+            children: [
+              // ── 1. Dominant Large Interactive Map (~58% Height) ───────────────
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: mapHeight,
+                child: AppMapWidget(
+                  mode: AppMapMode.tracking,
+                  center: MockLocationData.driverLocation,
+                  zoom: 14.2,
+                  driverLocation: MockLocationData.driverLocation,
+                  storeLocation: MockLocationData.storeLocation,
+                  destinationLocation: MockLocationData.customerLocation,
+                  routePoints: MockLocationData.deliveryRoute,
+                ),
+              ),
+
+              // ── 2. Top Overlays (Floating Back, Floating ETA Card, Dev Pill) ──
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            const Icon(Icons.bolt_rounded, size: 14, color: AppColors.brandRed),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Dev Status: ${order.statusEnum.label} (Tap to change)',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.brandRed),
+                            // Floating Back Button (Returns to Previous Screen)
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.gray900),
+                                onPressed: () => nav('back'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+
+                            // Floating ETA & Status Card Overlaid on Map
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.15),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFEF2F2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.timer_outlined, size: 18, color: AppColors.brandRed),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            order.statusEnum == OrderStatus.slaughtering
+                                                ? 'Ethical Slaughtering & Prep'
+                                                : order.statusEnum == OrderStatus.confirmed
+                                                    ? 'Order Received at Farm Store'
+                                                    : 'Estimated Arrival in ${order.etaText}',
+                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.gray900),
+                                          ),
+                                          Text(
+                                            order.statusEnum == OrderStatus.slaughtering
+                                                ? 'Fresh desi bird prepared on order'
+                                                : 'Live delivery tracking active',
+                                            style: const TextStyle(fontSize: 11, color: AppColors.gray500),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                  ),
+                        const SizedBox(height: 8),
 
-                  // Delivered State View
-                  if (order.statusEnum == OrderStatus.delivered) ...[
-                    _DeliveredStateCard(
-                      order: order,
-                      onRateSubmit: (score, feedback) {
-                        appState.rateOrder(order.id, score, feedback);
-                        showAppToast(context, 'Rating submitted! ⭐ Thank you.');
-                        nav('home');
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ] else ...[
-                    // Visual Mock Tracking Map Widget
-                    _VisualTrackingMap(
-                      status: order.statusEnum,
-                      etaText: order.etaText,
-                      address: order.address,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Driver Information Card (for assigned/outForDelivery)
-                    if (order.statusEnum == OrderStatus.driverAssigned || order.statusEnum == OrderStatus.outForDelivery) ...[
-                      _DriverInfoCard(driver: order.driverInfo),
-                      const SizedBox(height: 16),
-                    ],
-                  ],
-
-                  // Items Card
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: AppShadows.subtle,
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.asset(
-                            order.items.isNotEmpty ? order.items.first.product.img : 'assets/images/country_king.jpg',
-                            width: 70,
-                            height: 70,
-                            fit: BoxFit.cover,
+                        // Dev State Stepper Pill (Compact overlay right-aligned)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: InkWell(
+                            onTap: () {
+                              appState.advanceOrderStatus(order.id);
+                              showAppToast(context, 'Status updated: ${order.statusEnum.label}');
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: AppColors.brandRed.withValues(alpha: 0.4)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.bolt_rounded, size: 13, color: AppColors.brandRed),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Dev Status: ${order.statusEnum.label}',
+                                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: AppColors.brandRed),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── 3. Lower Delivery Information Sheet (Scrollable) ──────────────
+              Positioned.fill(
+                top: mapHeight - 24, // Overlaps bottom of map with rounded corners
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 16,
+                        offset: Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    child: ListView(
+                      padding: const EdgeInsets.all(20),
+                      children: [
+                        // Drag handle bar indicator
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: AppColors.gray300,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+
+                        // Priority Driver Information Card (Zomato/Swiggy style)
+                        if (order.statusEnum == OrderStatus.driverAssigned || order.statusEnum == OrderStatus.outForDelivery) ...[
+                          _DriverInfoCard(driver: order.driverInfo),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // Order Progress Timeline
+                        _OrderLifecycleTimeline(status: order.statusEnum),
+                        const SizedBox(height: 20),
+
+                        // Order Product Items Card
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.gray200),
+                            boxShadow: AppShadows.subtle,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.asset(
+                                  order.items.isNotEmpty ? order.items.first.product.img : 'assets/images/country_king.jpg',
+                                  width: 64,
+                                  height: 64,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      order.items.isNotEmpty ? order.items.first.product.name : 'Country King Chicken',
+                                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.gray900),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text('Order ID: #${order.id}', style: const TextStyle(fontSize: 11, color: AppColors.gray500)),
+                                    const SizedBox(height: 6),
+                                    Wrap(
+                                      spacing: 4,
+                                      runSpacing: 4,
+                                      children: [
+                                        _TagChip(label: order.items.isNotEmpty ? '${order.items.first.cut} Cut' : 'Medium Cut'),
+                                        _TagChip(label: order.items.isNotEmpty ? order.items.first.gender : 'Rooster'),
+                                        _TagChip(label: 'Qty: ${order.items.isNotEmpty ? order.items.first.qty : 1}'),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Delivery Address Card
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.gray200),
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                order.items.isNotEmpty ? order.items.first.product.name : 'Country King Chicken',
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.gray900),
+                              Row(
+                                children: const [
+                                  Icon(Icons.location_on_rounded, color: AppColors.brandRed, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Delivery Address', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+                                ],
                               ),
-                              const SizedBox(height: 2),
-                              Text('Order ID: #${order.id}', style: const TextStyle(fontSize: 11, color: AppColors.gray500)),
                               const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 4,
-                                runSpacing: 4,
+                              Text(order.address, style: const TextStyle(fontSize: 12.5, color: AppColors.gray600, height: 1.4)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Bill Summary Card
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.gray200),
+                          ),
+                          child: Column(
+                            children: [
+                              _BillLine(label: 'Item Subtotal', val: '₹${order.total - 40}'),
+                              const SizedBox(height: 6),
+                              const _BillLine(label: 'Delivery Fee', val: '₹40'),
+                              const Divider(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  _TagChip(label: order.items.isNotEmpty ? '${order.items.first.cut} Cut' : 'Medium Cut'),
-                                  _TagChip(label: order.items.isNotEmpty ? order.items.first.gender : 'Rooster'),
-                                  _TagChip(label: 'Qty: ${order.items.isNotEmpty ? order.items.first.qty : 1}'),
+                                  const Text('Total Amount', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.gray900)),
+                                  Text('₹${order.total}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.brandRed)),
                                 ],
                               ),
                             ],
                           ),
                         ),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-
-                  // Delivery Address Info Card
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.gray200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: const [
-                            Icon(Icons.location_on_rounded, color: AppColors.brandRed, size: 18),
-                            SizedBox(width: 8),
-                            Text('Delivery Address', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.gray900)),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(order.address, style: const TextStyle(fontSize: 12.5, color: AppColors.gray600, height: 1.4)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Bill Summary Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.gray200),
-                    ),
-                    child: Column(
-                      children: [
-                        _BillLine(label: 'Item Subtotal', val: '₹${order.total - 40}'),
-                        const SizedBox(height: 6),
-                        const _BillLine(label: 'Delivery Fee', val: '₹40'),
-                        const Divider(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Total Amount', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.gray900)),
-                            Text('₹${order.total}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.brandRed)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-// ─── VISUAL MOCK TRACKING MAP ────────────────────────────────────────────────
-class _VisualTrackingMap extends StatelessWidget {
-  final OrderStatus status;
-  final String etaText;
-  final String address;
 
-  const _VisualTrackingMap({
-    required this.status,
-    required this.etaText,
-    required this.address,
-  });
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 220,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFE5E7EB),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.gray300),
-        boxShadow: AppShadows.subtle,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          children: [
-            // Map Grid Background (Vector-style custom drawing layout)
-            Container(
-              color: const Color(0xFFE2E8F0),
-              child: CustomPaint(
-                size: Size.infinite,
-                painter: _MockMapPainter(),
-              ),
-            ),
 
-            // Top Floating ETA Badge
-            Positioned(
-              top: 12,
-              left: 12,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: AppShadows.card,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFEF2F2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.timer_outlined, size: 18, color: AppColors.brandRed),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            status == OrderStatus.slaughtering
-                                ? 'Ethical Slaughtering & Prep'
-                                : status == OrderStatus.confirmed
-                                    ? 'Order Received at Farm Store'
-                                    : 'Estimated Arrival in $etaText',
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.gray900),
-                          ),
-                          Text(
-                            status == OrderStatus.slaughtering
-                                ? 'Fresh desi bird prepared on order'
-                                : 'Live delivery tracking active',
-                            style: const TextStyle(fontSize: 11, color: AppColors.gray500),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Store Pin (Left)
-            Positioned(
-              bottom: 40,
-              left: 30,
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: AppColors.brandRed,
-                      shape: BoxShape.circle,
-                      boxShadow: AppShadows.card,
-                    ),
-                    child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 18),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text('Country Farm Store', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700)),
-                  ),
-                ],
-              ),
-            ),
-
-            // Customer Destination Pin (Right)
-            Positioned(
-              top: 75,
-              right: 30,
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF16A34A),
-                      shape: BoxShape.circle,
-                      boxShadow: AppShadows.card,
-                    ),
-                    child: const Icon(Icons.home_rounded, color: Colors.white, size: 18),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text('Delivery Location', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700)),
-                  ),
-                ],
-              ),
-            ),
-
-            // Delivery Partner Moving Marker (Middle)
-            if (status == OrderStatus.outForDelivery || status == OrderStatus.driverAssigned)
-              Positioned(
-                bottom: 80,
-                left: 140,
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: AppShadows.card,
-                      ),
-                      child: const Icon(Icons.delivery_dining_rounded, color: AppColors.brandRed, size: 24),
-                    ),
-                    const SizedBox(height: 2),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.brandRed,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text('Partner On The Way', style: TextStyle(fontSize: 8.5, color: Colors.white, fontWeight: FontWeight.w800)),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MockMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paintRoad = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 14
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final paintRoute = Paint()
-      ..color = const Color(0xFFEF4444)
-      ..strokeWidth = 4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    // Road grid
-    final pathGrid = Path();
-    pathGrid.moveTo(0, size.height * 0.7);
-    pathGrid.cubicTo(size.width * 0.3, size.height * 0.8, size.width * 0.5, size.height * 0.4, size.width, size.height * 0.35);
-
-    pathGrid.moveTo(size.width * 0.4, 0);
-    pathGrid.lineTo(size.width * 0.45, size.height);
-
-    canvas.drawPath(pathGrid, paintRoad);
-
-    // Route line
-    final pathRoute = Path();
-    pathRoute.moveTo(40, size.height * 0.7);
-    pathRoute.cubicTo(size.width * 0.3, size.height * 0.8, size.width * 0.5, size.height * 0.4, size.width - 45, size.height * 0.35);
-
-    canvas.drawPath(pathRoute, paintRoute);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 
 // ─── DRIVER INFO CARD ────────────────────────────────────────────────────────
 class _DriverInfoCard extends StatelessWidget {
@@ -1104,7 +1132,7 @@ class _CustOrdersScreenState extends State<CustOrdersScreen> {
               Row(
                 children: [
                   GestureDetector(
-                    onTap: () => widget.nav('home'),
+                    onTap: () => widget.nav('back'),
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: const BoxDecoration(
@@ -1830,49 +1858,4 @@ class _InfoItemRow extends StatelessWidget {
   }
 }
 
-class _CircleNavHeader extends StatelessWidget {
-  final String title;
-  final VoidCallback onBack;
-  const _CircleNavHeader({required this.title, required this.onBack});
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-        boxShadow: AppShadows.subtle,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.gray300),
-            ),
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              onPressed: onBack,
-              icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                  size: 16, color: AppColors.gray800),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.gray900),
-            ),
-          ),
-          const SizedBox(width: 38), // Balance for centering title
-        ],
-      ),
-    );
-  }
-}

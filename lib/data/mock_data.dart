@@ -56,7 +56,7 @@ final Map<String, List<Product>> kProducts = {
       id: 'kadaknath',
       name: 'Kadaknath Country',
       sub: 'Rare Black Chicken — Premium',
-      img: '${_img}kadaknath_real.jpg',
+      img: '${_img}k1.jpg',
       tags: const ['Rare Breed', 'Organic', 'Naturally-Hatched'],
       weight: '800–1000g',
       price: 1305,

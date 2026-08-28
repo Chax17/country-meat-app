@@ -131,7 +131,7 @@ class _CustCategoriesScreenState extends State<CustCategoriesScreen> {
                     ),
                     child: IconButton(
                       padding: EdgeInsets.zero,
-                      onPressed: () => widget.nav('home'),
+                      onPressed: () => widget.nav('back'),
                       icon: const Icon(Icons.arrow_back_ios_new_rounded,
                           size: 16, color: AppColors.gray800),
                     ),
@@ -550,7 +550,7 @@ class _CustListingScreenState extends State<CustListingScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () => widget.nav('categories'),
+                    onPressed: () => widget.nav('back'),
                     icon: const Icon(Icons.arrow_back_ios_new_rounded,
                         size: 18, color: AppColors.gray800),
                   ),

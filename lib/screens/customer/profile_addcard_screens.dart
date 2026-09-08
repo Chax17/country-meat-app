@@ -29,6 +29,19 @@ class _CustProfileScreenState extends State<CustProfileScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant CustProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.param != oldWidget.param &&
+        (widget.param == 'addresses' || widget.param == 'showAddressesSheet')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showAddressesSheet(context, context.read<AppState>());
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
 

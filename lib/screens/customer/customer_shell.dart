@@ -119,35 +119,35 @@ class _CustomerShellState extends State<CustomerShell> {
         screen == 'profile';
   }
 
-  void _handleBack() {
+  void _handleBack({String? param}) {
     if (_history.isNotEmpty) {
-      _pop();
+      _pop(param: param);
       return;
     }
     if (_isRootSection(_screen) && _screen != 'home') {
       setState(() {
         _navIndex = 0;
         _screen = 'home';
-        _param = null;
+        _param = param;
       });
       return;
     }
-    _pop();
+    _pop(param: param);
   }
 
-  void _pop() {
+  void _pop({String? param}) {
     if (_history.isNotEmpty) {
       final previous = _history.removeLast();
       setState(() {
         _authStep = previous.authStep;
         _screen = previous.screen;
-        _param = previous.param;
+        _param = param ?? previous.param;
         _navIndex = previous.navIndex;
       });
     } else {
       setState(() {
         _screen = 'home';
-        _param = null;
+        _param = param;
         _navIndex = 0;
       });
     }
@@ -155,7 +155,7 @@ class _CustomerShellState extends State<CustomerShell> {
 
   void _nav(String screen, {String? param}) {
     if (screen == 'back' || screen == 'pop') {
-      _handleBack();
+      _handleBack(param: param);
       return;
     }
 
@@ -371,6 +371,13 @@ class _CustomerShellState extends State<CustomerShell> {
             _param = targetParam;
           });
         },
+        onBack: () {
+          if (_history.isNotEmpty) {
+            _pop();
+          } else {
+            setState(() => _authStep = CustomerAuthStep.otp);
+          }
+        },
       );
     } else {
       // ── Main App ─────────────────────────────────────────────────────────
@@ -392,8 +399,9 @@ class _CustomerShellState extends State<CustomerShell> {
         );
       } else if (_screen == 'location') {
         final isProfileAddress = _param == 'profileAddress' || _param == 'profile';
-        final isHomeAddress = _param == 'homeAddress' || _param == 'home';
-        final isFromCart = _param == 'cart';
+        final isHomeAddress = _param == 'homeAddress' || _param == 'home' || _param == 'newAddress';
+        final isFromCart = _param == 'cart' || _param == 'fromCart';
+        final isNewAddress = _param == 'newAddress' || _param == 'new' || _param == 'add' || isProfileAddress;
 
         final LocationOrigin origin;
         if (isProfileAddress) {
@@ -409,6 +417,7 @@ class _CustomerShellState extends State<CustomerShell> {
         content = CustLocationScreen(
           origin: origin,
           fromCart: isFromCart,
+          startWithNewAddress: isNewAddress,
           onContinue: () {
             _nav('back', param: isProfileAddress ? 'addresses' : null);
           },
@@ -481,9 +490,9 @@ class _CustomerShellState extends State<CustomerShell> {
               desktopBody = CustPaymentScreen(nav: _nav);
             } else if (_screen == 'location') {
               final isProfileAddress = _param == 'profileAddress' || _param == 'profile';
-              final isHomeAddress = _param == 'homeAddress' || _param == 'home';
+              final isHomeAddress = _param == 'homeAddress' || _param == 'home' || _param == 'newAddress';
               final isFromCart = _param == 'cart' || _param == 'fromCart';
-              final isNewAddress = _param == 'newAddress' || _param == 'new' || _param == 'add';
+              final isNewAddress = _param == 'newAddress' || _param == 'new' || _param == 'add' || isProfileAddress;
 
               final LocationOrigin origin;
               if (isProfileAddress) {
@@ -543,9 +552,9 @@ class _CustomerShellState extends State<CustomerShell> {
               tabletBody = CustPaymentScreen(nav: _nav);
             } else if (_screen == 'location') {
               final isProfileAddress = _param == 'profileAddress' || _param == 'profile';
-              final isHomeAddress = _param == 'homeAddress' || _param == 'home';
+              final isHomeAddress = _param == 'homeAddress' || _param == 'home' || _param == 'newAddress';
               final isFromCart = _param == 'cart' || _param == 'fromCart';
-              final isNewAddress = _param == 'newAddress' || _param == 'new' || _param == 'add';
+              final isNewAddress = _param == 'newAddress' || _param == 'new' || _param == 'add' || isProfileAddress;
 
               final LocationOrigin origin;
               if (isProfileAddress) {

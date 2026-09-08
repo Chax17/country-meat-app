@@ -707,153 +707,160 @@ class CustTrackingScreen extends StatelessWidget {
                 ),
               ),
 
-              // ── 3. Lower Delivery Information Sheet (Scrollable) ──────────────
-              Positioned.fill(
-                top: mapHeight - 24, // Overlaps bottom of map with rounded corners
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 16,
-                        offset: Offset(0, -4),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                    child: ListView(
-                      padding: const EdgeInsets.all(20),
-                      children: [
-                        // Drag handle bar indicator
-                        Center(
-                          child: Container(
-                            width: 36,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              color: AppColors.gray300,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
+              // ── 3. Lower Delivery Information Sheet (Draggable & Scrollable) ──
+              DraggableScrollableSheet(
+                initialChildSize: 0.45,
+                minChildSize: 0.45,
+                maxChildSize: 0.94,
+                snap: true,
+                snapSizes: const [0.45, 0.94],
+                builder: (context, scrollController) {
+                  return Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 16,
+                          offset: Offset(0, -4),
                         ),
-
-                        // Priority Driver Information Card (Zomato/Swiggy style)
-                        if (order.statusEnum == OrderStatus.driverAssigned || order.statusEnum == OrderStatus.outForDelivery) ...[
-                          _DriverInfoCard(driver: order.driverInfo),
-                          const SizedBox(height: 20),
-                        ],
-
-                        // Order Progress Timeline
-                        _OrderLifecycleTimeline(status: order.statusEnum),
-                        const SizedBox(height: 20),
-
-                        // Order Product Items Card
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.gray200),
-                            boxShadow: AppShadows.subtle,
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.asset(
-                                  order.items.isNotEmpty ? order.items.first.product.img : 'assets/images/country_king.jpg',
-                                  width: 64,
-                                  height: 64,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      order.items.isNotEmpty ? order.items.first.product.name : 'Country King Chicken',
-                                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.gray900),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text('Order ID: #${order.id}', style: const TextStyle(fontSize: 11, color: AppColors.gray500)),
-                                    const SizedBox(height: 6),
-                                    Wrap(
-                                      spacing: 4,
-                                      runSpacing: 4,
-                                      children: [
-                                        _TagChip(label: order.items.isNotEmpty ? '${order.items.first.cut} Cut' : 'Medium Cut'),
-                                        _TagChip(label: order.items.isNotEmpty ? order.items.first.gender : 'Rooster'),
-                                        _TagChip(label: 'Qty: ${order.items.isNotEmpty ? order.items.first.qty : 1}'),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Delivery Address Card
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.gray200),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: const [
-                                  Icon(Icons.location_on_rounded, color: AppColors.brandRed, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('Delivery Address', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.gray900)),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(order.address, style: const TextStyle(fontSize: 12.5, color: AppColors.gray600, height: 1.4)),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Bill Summary Card
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.gray200),
-                          ),
-                          child: Column(
-                            children: [
-                              _BillLine(label: 'Item Subtotal', val: '₹${order.total - 40}'),
-                              const SizedBox(height: 6),
-                              const _BillLine(label: 'Delivery Fee', val: '₹40'),
-                              const Divider(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Total Amount', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.gray900)),
-                                  Text('₹${order.total}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.brandRed)),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
                       ],
                     ),
-                  ),
-                ),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                      child: ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(20),
+                        children: [
+                          // Drag handle bar indicator
+                          Center(
+                            child: Container(
+                              width: 36,
+                              height: 4,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: AppColors.gray300,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+
+                          // Priority Driver Information Card (Zomato/Swiggy style)
+                          if (order.statusEnum == OrderStatus.driverAssigned || order.statusEnum == OrderStatus.outForDelivery) ...[
+                            _DriverInfoCard(driver: order.driverInfo),
+                            const SizedBox(height: 20),
+                          ],
+
+                          // Order Progress Timeline
+                          _OrderLifecycleTimeline(status: order.statusEnum),
+                          const SizedBox(height: 20),
+
+                          // Order Product Items Card
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.gray200),
+                              boxShadow: AppShadows.subtle,
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.asset(
+                                    order.items.isNotEmpty ? order.items.first.product.img : 'assets/images/country_king.jpg',
+                                    width: 64,
+                                    height: 64,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        order.items.isNotEmpty ? order.items.first.product.name : 'Country King Chicken',
+                                        style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.gray900),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text('Order ID: #${order.id}', style: const TextStyle(fontSize: 11, color: AppColors.gray500)),
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                        spacing: 4,
+                                        runSpacing: 4,
+                                        children: [
+                                          _TagChip(label: order.items.isNotEmpty ? '${order.items.first.cut} Cut' : 'Medium Cut'),
+                                          _TagChip(label: order.items.isNotEmpty ? order.items.first.gender : 'Rooster'),
+                                          _TagChip(label: 'Qty: ${order.items.isNotEmpty ? order.items.first.qty : 1}'),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Delivery Address Card
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.gray200),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: const [
+                                    Icon(Icons.location_on_rounded, color: AppColors.brandRed, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Delivery Address', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.gray900)),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(order.address, style: const TextStyle(fontSize: 12.5, color: AppColors.gray600, height: 1.4)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Bill Summary Card
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.gray200),
+                            ),
+                            child: Column(
+                              children: [
+                                _BillLine(label: 'Item Subtotal', val: '₹${order.total - 40}'),
+                                const SizedBox(height: 6),
+                                const _BillLine(label: 'Delivery Fee', val: '₹40'),
+                                const Divider(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Total Amount', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.gray900)),
+                                    Text('₹${order.total}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.brandRed)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           );

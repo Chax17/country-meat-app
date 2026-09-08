@@ -9,6 +9,7 @@ import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_map_widget.dart';
 import '../../data/mock_location_data.dart';
+import 'cart_payment_screens.dart';
 import 'home_screen.dart';
 import 'profile_addcard_screens.dart';
 
@@ -1376,6 +1377,7 @@ class CustLocationScreen extends StatefulWidget {
 class _CustLocationScreenState extends State<CustLocationScreen> {
   late _LocationStep _step;
   _LocationStep? _previousStep;
+  _LocationStep? _stepBeforeMapPreview;
   String _selectedTag = 'Home'; // 'Home', 'Friend and Family', 'Others'
   String _currentLocationTitle = 'HSR Layout';
   String _currentSubAddress = 'HSR Layout, Gowtham PG, Bengaluru, Karnataka, India';
@@ -1417,11 +1419,22 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
       if (_step == _LocationStep.addressDetails) {
         _step = _previousStep ?? _LocationStep.map;
       } else if (_step == _LocationStep.map) {
-        _step = _LocationStep.search;
+        if (_stepBeforeMapPreview == _LocationStep.addressDetails) {
+          _stepBeforeMapPreview = null;
+          _step = _LocationStep.addressDetails;
+        } else {
+          _step = _LocationStep.search;
+        }
       } else if (_step == _LocationStep.search) {
-        _step = widget.fromCart ? _LocationStep.selectLocation : _LocationStep.initial;
+        if (_previousStep == _LocationStep.selectLocation) {
+          _step = _LocationStep.selectLocation;
+        } else if (widget.startWithNewAddress || widget.fromCart || widget.origin != LocationOrigin.onboarding) {
+          widget.onBack?.call();
+        } else {
+          _step = _LocationStep.initial;
+        }
       } else if (_step == _LocationStep.selectLocation) {
-        if (widget.fromCart) {
+        if (widget.fromCart || widget.origin != LocationOrigin.onboarding) {
           widget.onBack?.call();
         } else {
           _step = _LocationStep.initial;
@@ -1477,9 +1490,11 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
           if (_step == _LocationStep.initial || _step == _LocationStep.selectLocation || _step == _LocationStep.search) {
             final Widget dialogContent = _buildStepContent(context, appState);
 
-            final Widget bgScreen = widget.origin == LocationOrigin.profileAddress
-                ? CustProfileScreen(nav: (r, {param}) {})
-                : CustHomeScreen(nav: (r, {param}) {});
+            final Widget bgScreen = (widget.origin == LocationOrigin.cart || widget.fromCart)
+                ? CustCartScreen(nav: (r, {param}) {})
+                : (widget.origin == LocationOrigin.profileAddress
+                    ? CustProfileScreen(nav: (r, {param}) {})
+                    : CustHomeScreen(nav: (r, {param}) {}));
 
             return Scaffold(
               backgroundColor: Colors.transparent,
@@ -1674,6 +1689,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
           child: OutlinedButton(
             onPressed: () {
               setState(() {
+                _previousStep = _LocationStep.initial;
                 _step = _LocationStep.selectLocation;
               });
             },
@@ -1767,6 +1783,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
                 GestureDetector(
                   onTap: () {
                     setState(() {
+                      _previousStep = _LocationStep.selectLocation;
                       _step = _LocationStep.search;
                     });
                   },
@@ -1945,6 +1962,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
               child: OutlinedButton.icon(
                 onPressed: () {
                   setState(() {
+                    _previousStep = _LocationStep.selectLocation;
                     _step = _LocationStep.search;
                   });
                 },
@@ -2212,6 +2230,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       setState(() {
+                        _stepBeforeMapPreview = null;
                         _previousStep = _LocationStep.map;
                         _step = _LocationStep.addressDetails;
                       });
@@ -2259,6 +2278,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
                   zoom: 15.0,
                   onTap: () {
                     setState(() {
+                      _stepBeforeMapPreview = _LocationStep.addressDetails;
                       _step = _LocationStep.map;
                     });
                   },

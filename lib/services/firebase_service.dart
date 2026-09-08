@@ -8,18 +8,26 @@ class FirebaseService {
   factory FirebaseService() => _instance;
   FirebaseService._internal();
 
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  FirebaseFirestore? get _db {
+    try {
+      return FirebaseFirestore.instance;
+    } catch (_) {
+      return null;
+    }
+  }
 
   // ── 1. Seed Initial Products & Data ───────────────────────────────────────
   Future<void> seedDatabaseIfEmpty() async {
     try {
-      final snapshot = await _db.collection('products').limit(1).get();
+      final db = _db;
+      if (db == null) return;
+      final snapshot = await db.collection('products').limit(1).get();
       if (snapshot.docs.isEmpty) {
         debugPrint('🌱 Seeding products catalog to Firestore...');
-        final batch = _db.batch();
+        final batch = db.batch();
 
         for (final p in kAllProducts) {
-          final docRef = _db.collection('products').doc(p.id);
+          final docRef = db.collection('products').doc(p.id);
           batch.set(docRef, {
             'id': p.id,
             'name': p.name,
@@ -48,7 +56,9 @@ class FirebaseService {
 
   // ── 2. Real-time Stream Products ──────────────────────────────────────────
   Stream<List<Product>> getProductsStream() {
-    return _db.collection('products').snapshots().map((snapshot) {
+    final db = _db;
+    if (db == null) return Stream.value(kAllProducts);
+    return db.collection('products').snapshots().map((snapshot) {
       if (snapshot.docs.isEmpty) return kAllProducts;
       return snapshot.docs.map((doc) {
         final data = doc.data();
@@ -76,7 +86,9 @@ class FirebaseService {
   // ── 3. Save Order to Firestore ────────────────────────────────────────────
   Future<void> saveOrder(CustomerOrder order) async {
     try {
-      await _db.collection('orders').doc(order.id).set({
+      final db = _db;
+      if (db == null) return;
+      await db.collection('orders').doc(order.id).set({
         'id': order.id,
         'date': order.date,
         'total': order.total,
@@ -116,7 +128,9 @@ class FirebaseService {
 
   // ── 4. Real-time Stream Orders ─────────────────────────────────────────────
   Stream<List<CustomerOrder>> getOrdersStream() {
-    return _db
+    final db = _db;
+    if (db == null) return Stream.value([]);
+    return db
         .collection('orders')
         .orderBy('timestamp', descending: true)
         .snapshots()
@@ -185,7 +199,9 @@ class FirebaseService {
     required List<SavedAddress> addresses,
   }) async {
     try {
-      await _db.collection('users').doc(phone).set({
+      final db = _db;
+      if (db == null) return;
+      await db.collection('users').doc(phone).set({
         'phone': phone,
         'name': name,
         'rewardPoints': rewardPoints,

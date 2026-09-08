@@ -5,11 +5,27 @@ import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_map_widget.dart';
 import '../../data/mock_location_data.dart';
+import '../../services/notification_permission_service.dart';
 
 // ─── ORDER CONFIRMATION / ORDER STATUS (SCREEN 1) ────────────────────────────
-class CustConfirmationScreen extends StatelessWidget {
+class CustConfirmationScreen extends StatefulWidget {
   final void Function(String screen, {String? param}) nav;
   const CustConfirmationScreen({super.key, required this.nav});
+
+  @override
+  State<CustConfirmationScreen> createState() => _CustConfirmationScreenState();
+}
+
+class _CustConfirmationScreenState extends State<CustConfirmationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        NotificationPermissionService().requestPostOrderPermissionIfNeeded();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +63,7 @@ class CustConfirmationScreen extends StatelessWidget {
                     ),
                     child: IconButton(
                       padding: EdgeInsets.zero,
-                      onPressed: () => nav('back'),
+                      onPressed: () => widget.nav('back'),
                       icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.gray800),
                     ),
                   ),
@@ -237,7 +253,7 @@ class CustConfirmationScreen extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => nav('tracking', param: order.id),
+                  onPressed: () => widget.nav('tracking', param: order.id),
                   icon: const Icon(Icons.local_shipping_rounded, size: 18),
                   label: const Text('Track Order'),
                   style: ElevatedButton.styleFrom(
@@ -1444,10 +1460,8 @@ class _OrderCardItem extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      ElevatedButton.icon(
+                      ElevatedButton(
                         onPressed: onTap,
-                        icon: const Icon(Icons.chevron_right_rounded, size: 16),
-                        label: const Text('Details'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.brandRed,
                           foregroundColor: Colors.white,
@@ -1457,6 +1471,14 @@ class _OrderCardItem extends StatelessWidget {
                               borderRadius: BorderRadius.circular(8)),
                           textStyle: const TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Details'),
+                            SizedBox(width: 4),
+                            Icon(Icons.chevron_right_rounded, size: 16),
+                          ],
                         ),
                       ),
                     ],

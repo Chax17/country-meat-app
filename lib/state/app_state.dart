@@ -97,6 +97,23 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  int getProductQuantity(String productId) {
+    return cart
+        .where((c) => c.product.id == productId)
+        .fold(0, (sum, item) => sum + item.qty);
+  }
+
+  void incrementProductQuantity(Product p, {String cut = 'Medium', String? gender, String slot = '6AM–9AM'}) {
+    addToCart(p, cut: cut, gender: gender, slot: slot);
+  }
+
+  void decrementProductQuantity(String productId) {
+    final index = cart.indexWhere((c) => c.product.id == productId);
+    if (index != -1) {
+      changeQty(index, -1);
+    }
+  }
+
   void clearCart() {
     cart.clear();
     notifyListeners();
@@ -234,11 +251,42 @@ class AppState extends ChangeNotifier {
     return 250 - rewardPoints;
   }
 
+  // ── Delivery Slots ────────────────────────────────────────────────────────
+  static const String slotMorning = '6AM–9AM';
+  static const String slotLateMorning = '9AM–12PM';
+  static const List<String> allSlots = [slotMorning, slotLateMorning];
+
+  /// Checks if a given slot is currently open based on local device time.
+  /// Slot 1 (6AM–9AM): 06:00:00 to 08:59:59 (360 <= minutes < 540)
+  /// Slot 2 (9AM–12PM): 09:00:00 to 11:59:59 (540 <= minutes < 720)
+  static bool isSlotOpen(String slot, [DateTime? time]) {
+    final now = time ?? DateTime.now();
+    final currentMinutes = now.hour * 60 + now.minute;
+    if (slot == slotMorning) {
+      return currentMinutes >= (6 * 60) && currentMinutes < (9 * 60);
+    } else if (slot == slotLateMorning) {
+      return currentMinutes >= (9 * 60) && currentMinutes < (12 * 60);
+    }
+    return false;
+  }
+
+  /// Returns the currently active/open slot, or null if neither slot is open.
+  static String? getCurrentlyOpenSlot([DateTime? time]) {
+    if (isSlotOpen(slotMorning, time)) return slotMorning;
+    if (isSlotOpen(slotLateMorning, time)) return slotLateMorning;
+    return null;
+  }
+
+  /// Returns whether any slot is currently open.
+  static bool hasAnyOpenSlot([DateTime? time]) {
+    return getCurrentlyOpenSlot(time) != null;
+  }
+
   // ── User / Auth ───────────────────────────────────────────────────────────
   bool isLoggedIn = false;
   String userName = 'Arjun Kumar';
   String userPhone = '+91 98765 43210';
-  String selectedSlot = '6AM–9AM';
+  String selectedSlot = getCurrentlyOpenSlot() ?? '6AM–9AM';
   String? userBirthday;
 
   bool get isBirthdaySet => userBirthday != null && userBirthday!.isNotEmpty;
@@ -264,9 +312,15 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setLoggedIn(bool value) {
+    isLoggedIn = value;
+    notifyListeners();
+  }
+
   void updateUser(String name, String phone) {
     if (name.isNotEmpty) userName = name;
     if (phone.isNotEmpty) userPhone = phone;
+    isLoggedIn = true;
     notifyListeners();
     _syncUserToFirestore();
   }

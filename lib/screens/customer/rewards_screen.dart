@@ -144,26 +144,29 @@ class CustRewardsScreen extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
               ),
               const SizedBox(height: 12),
-              _EarnCard(
+              const _EarnCard(
                 icon: '🛒',
                 title: '5% Order Cashback',
                 desc: 'Earn 5% of total order value as reward points',
                 pts: '+5%',
-                onTap: () => nav('categories'),
+                onTap: null,
+                isLocked: true,
               ),
-              _EarnCard(
+              const _EarnCard(
                 icon: '⭐',
                 title: 'Review Rewards',
                 desc: 'Rate and review your delivery partner',
                 pts: '+25',
-                onTap: () => nav('orders'),
+                onTap: null,
+                isLocked: true,
               ),
-              _EarnCard(
+              const _EarnCard(
                 icon: '👥',
                 title: 'Referral Bonus',
                 desc: 'Earn when your friends place their first order',
                 pts: '+100',
-                onTap: () => nav('referral'),
+                onTap: null,
+                isLocked: true,
               ),
               const SizedBox(height: 24),
 
@@ -594,40 +597,53 @@ class CustRewardsScreen extends StatelessWidget {
 class _EarnCard extends StatelessWidget {
   final String icon, title, desc, pts;
   final VoidCallback? onTap;
-  const _EarnCard(
-      {required this.icon,
-      required this.title,
-      required this.desc,
-      required this.pts,
-      this.onTap});
+  final bool isLocked;
+  const _EarnCard({
+    required this.icon,
+    required this.title,
+    required this.desc,
+    required this.pts,
+    this.onTap,
+    this.isLocked = false,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: isLocked ? AppColors.gray50 : AppColors.white,
           borderRadius: BorderRadius.circular(AppRadius.base),
-          boxShadow: AppShadows.subtle,
-          border: Border.all(color: AppColors.gray100),
+          boxShadow: isLocked ? null : AppShadows.subtle,
+          border: Border.all(
+            color: isLocked ? AppColors.gray200 : AppColors.gray100,
+          ),
         ),
         child: Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.base),
           child: InkWell(
-            onTap: onTap,
+            onTap: isLocked ? null : onTap,
             borderRadius: BorderRadius.circular(AppRadius.base),
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Row(children: [
-                Text(icon, style: const TextStyle(fontSize: 24)),
+                Opacity(
+                  opacity: isLocked ? 0.6 : 1.0,
+                  child: Text(icon, style: const TextStyle(fontSize: 24)),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 13)),
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: isLocked ? AppColors.gray600 : null,
+                          ),
+                        ),
                         Text(desc,
                             style: const TextStyle(
                                 color: AppColors.gray400, fontSize: 11.5)),
@@ -637,14 +653,32 @@ class _EarnCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.successLight,
+                    color:
+                        isLocked ? AppColors.gray100 : AppColors.successLight,
                     borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
-                  child: Text(pts,
-                      style: const TextStyle(
-                          color: AppColors.success,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isLocked) ...[
+                        const Icon(
+                          Icons.lock_outline_rounded,
+                          size: 12,
+                          color: AppColors.gray500,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Text(
+                        pts,
+                        style: TextStyle(
+                          color:
+                              isLocked ? AppColors.gray500 : AppColors.success,
                           fontWeight: FontWeight.w700,
-                          fontSize: 12)),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ]),
             ),

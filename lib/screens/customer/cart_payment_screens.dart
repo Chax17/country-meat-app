@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/payment_assets.dart';
@@ -16,9 +17,29 @@ class CustCartScreen extends StatefulWidget {
 class _CustCartScreenState extends State<CustCartScreen> {
   final _couponCtrl = TextEditingController();
   bool _couponApplied = false;
+  Timer? _slotRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-select the open slot if available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final appState = context.read<AppState>();
+      final openSlot = AppState.getCurrentlyOpenSlot();
+      if (openSlot != null && !AppState.isSlotOpen(appState.selectedSlot)) {
+        appState.setSlot(openSlot);
+      }
+    });
+    // Periodically refresh the cart screen so slot status updates live across time boundaries
+    _slotRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
+    _slotRefreshTimer?.cancel();
     _couponCtrl.dispose();
     super.dispose();
   }
@@ -150,14 +171,59 @@ class _CustCartScreenState extends State<CustCartScreen> {
 
                 // Delivery slot
                 const SizedBox(height: 4),
-                const Text('Delivery Slot',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                Row(
+                  children: [
+                    const Text('Delivery Slot',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppState.hasAnyOpenSlot()
+                            ? AppColors.success.withValues(alpha: 0.12)
+                            : AppColors.gray200,
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.circle,
+                            size: 6,
+                            color: AppState.hasAnyOpenSlot()
+                                ? AppColors.success
+                                : AppColors.gray500,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            AppState.hasAnyOpenSlot() ? 'Slots Active' : 'Slots Closed',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppState.hasAnyOpenSlot()
+                                  ? AppColors.success
+                                  : AppColors.gray600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 8),
                 Row(children: [
-                  _SlotChip(label: '6AM–9AM', selected: appState.selectedSlot == '6AM–9AM',
-                      onTap: () => appState.setSlot('6AM–9AM')),
-                  _SlotChip(label: '9AM–12PM', selected: appState.selectedSlot == '9AM–12PM',
-                      onTap: () => appState.setSlot('9AM–12PM')),
+                  _SlotChip(
+                    label: AppState.slotMorning,
+                    selected: appState.selectedSlot == AppState.slotMorning,
+                    isOpen: AppState.isSlotOpen(AppState.slotMorning),
+                    onTap: () => appState.setSlot(AppState.slotMorning),
+                  ),
+                  _SlotChip(
+                    label: AppState.slotLateMorning,
+                    selected: appState.selectedSlot == AppState.slotLateMorning,
+                    isOpen: AppState.isSlotOpen(AppState.slotLateMorning),
+                    onTap: () => appState.setSlot(AppState.slotLateMorning),
+                  ),
                 ]),
 
                 const SizedBox(height: 14),
@@ -1049,8 +1115,14 @@ class _QtyBtn extends StatelessWidget {
 class _SlotChip extends StatelessWidget {
   final String label;
   final bool selected;
+  final bool isOpen;
   final VoidCallback onTap;
-  const _SlotChip({required this.label, required this.selected, required this.onTap});
+  const _SlotChip({
+    required this.label,
+    required this.selected,
+    required this.isOpen,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -1058,18 +1130,63 @@ class _SlotChip extends StatelessWidget {
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: selected ? AppColors.brandRedBg : AppColors.gray50,
+        color: isOpen
+            ? (selected ? AppColors.brandRedBg : AppColors.gray50)
+            : AppColors.gray100,
         border: Border.all(
-            color: selected ? AppColors.brandRed : AppColors.gray200, width: 1.5),
+          color: isOpen
+              ? (selected ? AppColors.brandRed : AppColors.gray200)
+              : AppColors.gray200,
+          width: selected ? 1.5 : 1.0,
+        ),
         borderRadius: BorderRadius.circular(AppRadius.full),
       ),
-      child: Text(label,
-          style: TextStyle(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.circle,
+            size: 7,
+            color: isOpen ? AppColors.success : AppColors.gray400,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: selected ? AppColors.brandRed : AppColors.gray600,
-              fontSize: 13)),
+              color: isOpen
+                  ? (selected ? AppColors.brandRed : AppColors.gray800)
+                  : AppColors.gray500,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+            decoration: BoxDecoration(
+              color: isOpen
+                  ? (selected
+                      ? AppColors.brandRed.withValues(alpha: 0.15)
+                      : AppColors.success.withValues(alpha: 0.12))
+                  : AppColors.gray200,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              isOpen ? 'OPEN' : 'CLOSED',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                color: isOpen
+                    ? (selected ? AppColors.brandRed : AppColors.success)
+                    : AppColors.gray500,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

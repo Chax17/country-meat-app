@@ -25,38 +25,64 @@ class CustSplashScreen extends StatefulWidget {
 }
 
 class _CustSplashScreenState extends State<CustSplashScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _fade;
+    with TickerProviderStateMixin {
+  late final AnimationController _scaleCtrl;
+  late final AnimationController _fadeCtrl;
+  late final Animation<double> _scaleAnim;
+  late final Animation<double> _fadeAnim;
+
   Timer? _timer1;
   Timer? _timer2;
   bool _isInitStarted = false;
-  bool _isPrecached = false;
 
   @override
   void initState() {
     super.initState();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
 
-    _ctrl = AnimationController(
+    // State 1 logo scale animation on red background (0.96 -> 1.02)
+    _scaleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _scaleAnim = Tween<double>(begin: 0.96, end: 1.02).animate(
+      CurvedAnimation(parent: _scaleCtrl, curve: Curves.easeOutCubic),
+    );
+
+    // State 2 transition: Cross-fade to white background + red logo
+    _fadeCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
-
-    _fade = CurvedAnimation(
-      parent: _ctrl,
+    _fadeAnim = CurvedAnimation(
+      parent: _fadeCtrl,
       curve: Curves.easeInOut,
     );
 
-    _ctrl.addStatusListener((status) {
+    _fadeCtrl.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        // State 2 hold (~600ms) -> Route to Home or Welcome
-        _timer2 = Timer(const Duration(milliseconds: 600), () {
+        // State 2 hold (800ms) -> Route to next screen (Login on Mobile, Home on Web)
+        _timer2 = Timer(const Duration(milliseconds: 800), () {
           if (mounted) {
             widget.onDone();
           }
         });
       }
+    });
+
+    // Start State 1 hold and scale animation ONLY AFTER the first frame is rendered on screen.
+    // This ensures State 1 is visible on physical devices for the full 1200ms regardless of startup lag.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _scaleCtrl.forward();
+
+      // State 1 hold (1200ms) -> Start cross-fade transition to State 2
+      _timer1 = Timer(const Duration(milliseconds: 1200), () {
+        if (mounted) {
+          SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
+          _fadeCtrl.forward();
+        }
+      });
     });
   }
 
@@ -65,75 +91,85 @@ class _CustSplashScreenState extends State<CustSplashScreen>
     super.didChangeDependencies();
     if (!_isInitStarted) {
       _isInitStarted = true;
-      _initSplash();
+      try {
+        precacheImage(const AssetImage('assets/images/logo_white_cropped.png'), context);
+        precacheImage(const AssetImage('assets/images/logo_white.png'), context);
+      } catch (_) {}
     }
-  }
-
-  Future<void> _initSplash() async {
-    // Precache splash logo assets so they are fully decoded into GPU memory
-    // before presenting the first splash frame.
-    await Future.wait([
-      precacheImage(const AssetImage('assets/images/logo_white.png'), context),
-      precacheImage(const AssetImage('assets/images/logo_transp.png'), context),
-    ]);
-
-    if (!mounted) return;
-
-    setState(() {
-      _isPrecached = true;
-    });
-
-    // State 1 hold (~800ms) -> Start cross-fade to State 2
-    _timer1 = Timer(const Duration(milliseconds: 800), () {
-      if (mounted) {
-        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
-        _ctrl.forward();
-      }
-    });
   }
 
   @override
   void dispose() {
     _timer1?.cancel();
     _timer2?.cancel();
-    _ctrl.dispose();
+    _scaleCtrl.dispose();
+    _fadeCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isPrecached) {
-      return const SizedBox.shrink();
-    }
+    final screenWidth = MediaQuery.of(context).size.width;
+    final logoWidth = screenWidth * 0.7 > 280 ? 280.0 : screenWidth * 0.7;
+    final logoHeight = logoWidth / (3734.0 / 1448.0);
 
-    final logoWidth = MediaQuery.of(context).size.width * 0.7;
+    debugPrint('[SPLASH DIAGNOSTIC] build: logoWidth=$logoWidth, logoHeight=$logoHeight, scaleCtrl=${_scaleCtrl.value}, scaleAnim=${_scaleAnim.value}, fadeCtrl=${_fadeCtrl.value}, fadeAnim=${_fadeAnim.value}');
 
     return Scaffold(
+      backgroundColor: AppColors.brandRed,
       body: Stack(
         children: [
-          // ── STATE 1: Red background + dedicated white logo asset ─────────
+          // ── STATE 1: Red background + white logo (Visible on Frame 0) ──────
           Container(
             color: AppColors.brandRed,
             child: Center(
-              child: Image.asset(
-                'assets/images/logo_white.png',
-                width: logoWidth,
-                fit: BoxFit.contain,
+              child: ScaleTransition(
+                scale: _scaleAnim,
+                child: SizedBox(
+                  width: logoWidth,
+                  height: logoHeight,
+                  child: Image.asset(
+                    'assets/images/logo_white_cropped.png',
+                    width: logoWidth,
+                    height: logoHeight,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'assets/images/logo_white.png',
+                      width: logoWidth,
+                      height: logoHeight,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
+
           // ── STATE 2: White background + red logo (Cross-fades over State 1) ─
           FadeTransition(
-            opacity: _fade,
+            opacity: _fadeAnim,
             child: Container(
               color: Colors.white,
               child: Center(
-                child: Image.asset(
-                  'assets/images/logo_transp.png',
+                child: SizedBox(
                   width: logoWidth,
-                  fit: BoxFit.contain,
-                  color: AppColors.brandRed,
-                  colorBlendMode: BlendMode.srcIn,
+                  height: logoHeight,
+                  child: Image.asset(
+                    'assets/images/logo_white_cropped.png',
+                    width: logoWidth,
+                    height: logoHeight,
+                    fit: BoxFit.contain,
+                    color: AppColors.brandRed,
+                    colorBlendMode: BlendMode.srcIn,
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'assets/images/logo_white.png',
+                      width: logoWidth,
+                      height: logoHeight,
+                      fit: BoxFit.contain,
+                      color: AppColors.brandRed,
+                      colorBlendMode: BlendMode.srcIn,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -194,6 +230,136 @@ class _CustOnboardingScreenState extends State<CustOnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 768) {
+          return _buildDesktopLayout(context);
+        }
+        return _buildMobileLayout(context);
+      },
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Container(
+      width: 960,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: AppShadows.card,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              color: AppColors.brandRed,
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/images/logo_white_cropped.png',
+                    width: 240,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'assets/images/logo_white.png',
+                      width: 240,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    height: 280,
+                    child: Image.asset(
+                      'assets/images/getStarted.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Image.asset(
+                        'assets/images/ob_icon5.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(44),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  RichText(
+                    text: const TextSpan(
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.gray500,
+                        fontFamily: 'Inter',
+                      ),
+                      children: [
+                        TextSpan(text: 'Welcome to '),
+                        TextSpan(
+                          text: 'Country Meat',
+                          style: TextStyle(
+                            color: AppColors.brandRed,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'A company by the meat lovers\nfor the meat lovers',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.gray900,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Organically raised country chicken, pasture-fed mutton, and farm-fresh eggs delivered at dawn directly from village farms.',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      color: AppColors.gray600,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 36),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: widget.onDone,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.brandRed,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      child: const Text('Get Started →'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final logoWidth = mediaQuery.size.width * 0.7;
 
@@ -206,13 +372,11 @@ class _CustOnboardingScreenState extends State<CustOnboardingScreen>
           child: SafeArea(
             child: Column(
               children: [
-                // ── Top Section: Country Meat Logo + Value Circles ────────────────
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                     child: Column(
                       children: [
-                        // Country Meat logo (cropped asset without 68.7% vertical transparent padding)
                         Image.asset(
                           'assets/images/logo_white_cropped.png',
                           width: logoWidth,
@@ -224,7 +388,6 @@ class _CustOnboardingScreenState extends State<CustOnboardingScreen>
                           ),
                         ),
                         const SizedBox(height: 12),
-                        // Six circular illustrated value propositions
                         Expanded(
                           child: Center(
                             child: Image.asset(
@@ -241,8 +404,6 @@ class _CustOnboardingScreenState extends State<CustOnboardingScreen>
                     ),
                   ),
                 ),
-
-                // ── White bottom card ─────────────────────────────────────────────
                 Container(
                   width: double.infinity,
                   decoration: const BoxDecoration(
@@ -327,6 +488,8 @@ class CustLoginScreen extends StatefulWidget {
 
 class _CustLoginScreenState extends State<CustLoginScreen> {
   final _ctrl = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMsg;
 
   @override
   void dispose() {
@@ -335,8 +498,24 @@ class _CustLoginScreenState extends State<CustLoginScreen> {
   }
 
   void _submit() {
+    if (_isLoading) return;
+
     final raw = _ctrl.text.trim();
-    final phoneNum = raw.isEmpty ? '9876543210' : raw;
+    final digitsOnly = raw.replaceAll(RegExp(r'\D'), '');
+
+    if (raw.isNotEmpty && digitsOnly.length != 10) {
+      setState(() {
+        _errorMsg = 'Please enter a valid 10-digit mobile number';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = false;
+      _errorMsg = null;
+    });
+
+    final phoneNum = digitsOnly.isEmpty ? '9876543210' : digitsOnly;
     final fullPhone = phoneNum.startsWith('+91') ? phoneNum : '+91 $phoneNum';
     widget.onContinue(fullPhone);
   }
@@ -372,169 +551,329 @@ class _CustLoginScreenState extends State<CustLoginScreen> {
     );
   }
 
+  Widget _buildSendOtpButton({required double verticalPadding, String label = 'Get OTP'}) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _submit,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.brandRed,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: AppColors.brandRed.withOpacity(0.7),
+          disabledForegroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(vertical: verticalPadding),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          elevation: 0,
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : Text(label),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: IconButton(
-                            onPressed: () => Navigator.of(context).maybePop(),
-                            icon: const Icon(Icons.chevron_left),
-                            iconSize: 18,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            style: IconButton.styleFrom(
-                              shape: const CircleBorder(),
-                              side: const BorderSide(
-                                color: AppColors.gray300,
-                                width: 1,
-                              ),
-                            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isDesktop = constraints.maxWidth >= 768;
+
+        if (isDesktop) {
+          return Center(
+            child: Container(
+              width: 480,
+              padding: const EdgeInsets.all(36),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                boxShadow: AppShadows.card,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  // Logo small
+                  Center(
+                    child: Image.asset(
+                      'assets/images/logo_white_cropped.png',
+                      width: 190,
+                      fit: BoxFit.contain,
+                      color: AppColors.brandRed,
+                      colorBlendMode: BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Login with your mobile number',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.gray900,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Mobile Number',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.gray800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Phone input
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3E6E6),
+                      border: Border.all(color: const Color(0xFFE2C8C8), width: 1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _buildIndiaFlag(),
+                        Container(
+                          width: 1,
+                          height: 18,
+                          color: const Color(0xFFD4BDBD),
+                          margin: const EdgeInsets.symmetric(horizontal: 10),
+                        ),
+                        const Text(
+                          '+91',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF9E8A8A),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 28),
-                      // Logo small
-                      Center(
-                        child: Image.asset(
-                          'assets/images/logo_white_cropped.png',
-                          width: 190,
-                          fit: BoxFit.contain,
-                          color: AppColors.brandRed,
-                          colorBlendMode: BlendMode.srcIn,
+                        Container(
+                          width: 1,
+                          height: 18,
+                          color: const Color(0xFFD4BDBD),
+                          margin: const EdgeInsets.symmetric(horizontal: 10),
                         ),
-                      ),
-                      const SizedBox(height: 36),
-                      const Text(
-                        'Login with your mobile number',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.gray900,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Mobile Number',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.gray800,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Phone input
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF3E6E6),
-                          border: Border.all(color: const Color(0xFFE2C8C8), width: 1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            _buildIndiaFlag(),
-                            Container(
-                              width: 1,
-                              height: 18,
-                              color: const Color(0xFFD4BDBD),
-                              margin: const EdgeInsets.symmetric(horizontal: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: _ctrl,
+                            keyboardType: TextInputType.phone,
+                            maxLength: 10,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.gray900,
                             ),
-                            const Text(
-                              '+91',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
+                            decoration: const InputDecoration(
+                              filled: false,
+                              fillColor: Colors.transparent,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              errorBorder: InputBorder.none,
+                              focusedErrorBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              hintText: '12345-67890',
+                              hintStyle: TextStyle(
                                 color: Color(0xFF9E8A8A),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
                               ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 18,
-                              color: const Color(0xFFD4BDBD),
-                              margin: const EdgeInsets.symmetric(horizontal: 10),
-                            ),
-                            Expanded(
-                              child: TextField(
-                                controller: _ctrl,
-                                keyboardType: TextInputType.phone,
-                                maxLength: 10,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.gray900,
-                                ),
-                                decoration: const InputDecoration(
-                                  filled: false,
-                                  fillColor: Colors.transparent,
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  errorBorder: InputBorder.none,
-                                  focusedErrorBorder: InputBorder.none,
-                                  disabledBorder: InputBorder.none,
-                                  hintText: '12345-67890',
-                                  hintStyle: TextStyle(
-                                    color: Color(0xFF9E8A8A),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                  contentPadding: EdgeInsets.zero,
-                                  isDense: true,
-                                  counterText: '',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _submit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.brandRed,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 0,
-                            textStyle: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                              contentPadding: EdgeInsets.zero,
+                              isDense: true,
+                              counterText: '',
                             ),
                           ),
-                          child: const Text('Get OTP'),
                         ),
+                      ],
+                    ),
+                  ),
+                  if (_errorMsg != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _errorMsg!,
+                      style: const TextStyle(
+                        color: AppColors.brandRed,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
-                      const SizedBox(height: 24),
-                    ],
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  _buildSendOtpButton(verticalPadding: 16, label: 'Get OTP'),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: IconButton(
+                              onPressed: () => Navigator.of(context).maybePop(),
+                              icon: const Icon(Icons.chevron_left),
+                              iconSize: 18,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              style: IconButton.styleFrom(
+                                shape: const CircleBorder(),
+                                side: const BorderSide(
+                                  color: AppColors.gray300,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        // Logo small
+                        Center(
+                          child: Image.asset(
+                            'assets/images/logo_white_cropped.png',
+                            width: 190,
+                            fit: BoxFit.contain,
+                            color: AppColors.brandRed,
+                            colorBlendMode: BlendMode.srcIn,
+                          ),
+                        ),
+                        const SizedBox(height: 36),
+                        const Text(
+                          'Login with your mobile number',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.gray900,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Mobile Number',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.gray800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Phone input
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3E6E6),
+                            border: Border.all(color: const Color(0xFFE2C8C8), width: 1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              _buildIndiaFlag(),
+                              Container(
+                                width: 1,
+                                height: 18,
+                                color: const Color(0xFFD4BDBD),
+                                margin: const EdgeInsets.symmetric(horizontal: 10),
+                              ),
+                              const Text(
+                                '+91',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF9E8A8A),
+                                ),
+                              ),
+                              Container(
+                                width: 1,
+                                height: 18,
+                                color: const Color(0xFFD4BDBD),
+                                margin: const EdgeInsets.symmetric(horizontal: 10),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _ctrl,
+                                  keyboardType: TextInputType.phone,
+                                  maxLength: 10,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.gray900,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    filled: false,
+                                    fillColor: Colors.transparent,
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    errorBorder: InputBorder.none,
+                                    focusedErrorBorder: InputBorder.none,
+                                    disabledBorder: InputBorder.none,
+                                    hintText: '12345-67890',
+                                    hintStyle: TextStyle(
+                                      color: Color(0xFF9E8A8A),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                    contentPadding: EdgeInsets.zero,
+                                    isDense: true,
+                                    counterText: '',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_errorMsg != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _errorMsg!,
+                            style: const TextStyle(
+                              color: AppColors.brandRed,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        const SizedBox(height: 16),
+                        _buildSendOtpButton(verticalPadding: 14, label: 'Get OTP'),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
-        ),
-      ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -554,8 +893,13 @@ class _CustOtpScreenState extends State<CustOtpScreen> {
   final _focusNodes = List.generate(4, (_) => FocusNode());
   int _secondsLeft = 30;
   Timer? _timer;
+  bool _isLoading = false;
   bool _hasSubmitted = false;
   int _resendCount = 0;
+  String? _errorMsg;
+
+  bool get _isOtpComplete =>
+      _controllers.every((c) => c.text.trim().isNotEmpty);
 
   @override
   void initState() {
@@ -588,6 +932,7 @@ class _CustOtpScreenState extends State<CustOtpScreen> {
     if (_resendCount >= 2 || _secondsLeft > 0) return;
     setState(() {
       _resendCount++;
+      _errorMsg = null;
     });
     _startTimer(59);
   }
@@ -616,7 +961,25 @@ class _CustOtpScreenState extends State<CustOtpScreen> {
     return '+91 $raw';
   }
 
-  void _triggerContinue() {
+  Future<void> _handleLogin() async {
+    if (_isLoading || !_isOtpComplete) return;
+
+    final otpCode = _controllers.map((c) => c.text.trim()).join();
+    if (otpCode.length < 4) {
+      setState(() {
+        _errorMsg = 'Please enter all 4 digits of the OTP';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMsg = null;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+
     if (!_hasSubmitted) {
       _hasSubmitted = true;
       widget.onContinue();
@@ -624,16 +987,50 @@ class _CustOtpScreenState extends State<CustOtpScreen> {
   }
 
   void _handleOtpChanged(int index, String value) {
+    if (_errorMsg != null) {
+      setState(() => _errorMsg = null);
+    }
     if (value.length == 1 && index < 3) {
       _focusNodes[index + 1].requestFocus();
     } else if (value.isEmpty && index > 0) {
       _focusNodes[index - 1].requestFocus();
     }
+    setState(() {});
+  }
 
-    // Auto verify when all 4 boxes are filled
-    if (_controllers.every((c) => c.text.isNotEmpty)) {
-      _triggerContinue();
-    }
+  Widget _buildLoginButton({required double verticalPadding}) {
+    final enabled = _isOtpComplete && !_isLoading;
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: enabled ? _handleLogin : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.brandRed,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: AppColors.brandRed.withOpacity(0.5),
+          disabledForegroundColor: Colors.white.withOpacity(0.8),
+          padding: EdgeInsets.symmetric(vertical: verticalPadding),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          elevation: 0,
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : const Text('Login'),
+      ),
+    );
   }
 
   Widget _buildOtpFields() {
@@ -764,110 +1161,183 @@ class _CustOtpScreenState extends State<CustOtpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: IconButton(
-                            onPressed: () => Navigator.of(context).maybePop(),
-                            icon: const Icon(Icons.chevron_left),
-                            iconSize: 18,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            style: IconButton.styleFrom(
-                              shape: const CircleBorder(),
-                              side: const BorderSide(
-                                color: AppColors.gray300,
-                                width: 1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isDesktop = constraints.maxWidth >= 768;
+
+        if (isDesktop) {
+          return Center(
+            child: Container(
+              width: 480,
+              padding: const EdgeInsets.all(36),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                boxShadow: AppShadows.card,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  // Logo small
+                  Center(
+                    child: Image.asset(
+                      'assets/images/logo_white_cropped.png',
+                      width: 190,
+                      fit: BoxFit.contain,
+                      color: AppColors.brandRed,
+                      colorBlendMode: BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Center(
+                    child: const Text(
+                      'Verify with OTP sent to',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gray900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Center(
+                    child: Text(
+                      _formattedPhone,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.brandRed,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  // 4 OTP Boxes
+                  _buildOtpFields(),
+                  const SizedBox(height: 16),
+                  // Resend text / timer
+                  _buildResendSection(),
+                  if (_errorMsg != null) ...[
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Text(
+                        _errorMsg!,
+                        style: const TextStyle(
+                          color: AppColors.brandRed,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  _buildLoginButton(verticalPadding: 16),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: IconButton(
+                              onPressed: () => Navigator.of(context).maybePop(),
+                              icon: const Icon(Icons.chevron_left),
+                              iconSize: 18,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              style: IconButton.styleFrom(
+                                shape: const CircleBorder(),
+                                side: const BorderSide(
+                                  color: AppColors.gray300,
+                                  width: 1,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 28),
-                      // Logo small
-                      Center(
-                        child: Image.asset(
-                          'assets/images/logo_white_cropped.png',
-                          width: 190,
-                          fit: BoxFit.contain,
-                          color: AppColors.brandRed,
-                          colorBlendMode: BlendMode.srcIn,
+                        const SizedBox(height: 28),
+                        // Logo small
+                        Center(
+                          child: Image.asset(
+                            'assets/images/logo_white_cropped.png',
+                            width: 190,
+                            fit: BoxFit.contain,
+                            color: AppColors.brandRed,
+                            colorBlendMode: BlendMode.srcIn,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 36),
-                      Center(
-                        child: const Text(
-                          'Verify with OTP sent to',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w600,
-                          color: AppColors.gray900,
-                        ),
-                      ),
-                      ),
-                      const SizedBox(height: 6),
-                      Center(
-                        child: Text(
-                          _formattedPhone,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.gray600,
-                        ),
-                      ),
-                      ),
-                      const SizedBox(height: 28),
-                      // 4 OTP Boxes
-                      _buildOtpFields(),
-                      const SizedBox(height: 16),
-                      // Resend text / timer
-                      _buildResendSection(),
-                      const Spacer(),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _triggerContinue,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.brandRed,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 0,
-                            textStyle: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                        const SizedBox(height: 36),
+                        Center(
+                          child: const Text(
+                            'Verify with OTP sent to',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.gray900,
                             ),
                           ),
-                          child: const Text('Continue'),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
+                        const SizedBox(height: 6),
+                        Center(
+                          child: Text(
+                            _formattedPhone,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.gray600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        // 4 OTP Boxes
+                        _buildOtpFields(),
+                        const SizedBox(height: 16),
+                        // Resend text / timer
+                        _buildResendSection(),
+                        if (_errorMsg != null) ...[
+                          const SizedBox(height: 12),
+                          Center(
+                            child: Text(
+                              _errorMsg!,
+                              style: const TextStyle(
+                                color: AppColors.brandRed,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        const SizedBox(height: 16),
+                        _buildLoginButton(verticalPadding: 14),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
-        ),
-      ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -887,6 +1357,7 @@ class CustLocationScreen extends StatefulWidget {
   final LocationOrigin origin;
   final VoidCallback onContinue;
   final bool fromCart;
+  final bool startWithNewAddress;
   final VoidCallback? onBack;
 
   const CustLocationScreen({
@@ -894,6 +1365,7 @@ class CustLocationScreen extends StatefulWidget {
     this.origin = LocationOrigin.onboarding,
     required this.onContinue,
     this.fromCart = false,
+    this.startWithNewAddress = false,
     this.onBack,
   });
 
@@ -918,7 +1390,11 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
   @override
   void initState() {
     super.initState();
-    _step = widget.fromCart ? _LocationStep.selectLocation : _LocationStep.initial;
+    if (widget.startWithNewAddress) {
+      _step = _LocationStep.search;
+    } else {
+      _step = widget.fromCart ? _LocationStep.selectLocation : _LocationStep.initial;
+    }
     _flatCtrl = TextEditingController();
     _areaCtrl = TextEditingController();
     _receiverNameCtrl = TextEditingController();
@@ -994,9 +1470,110 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
         if (didPop) return;
         _goBack();
       },
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: _buildStepContent(context, appState),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isDesktop = constraints.maxWidth >= 768;
+
+          if (_step == _LocationStep.initial || _step == _LocationStep.selectLocation || _step == _LocationStep.search) {
+            final Widget dialogContent = _buildStepContent(context, appState);
+
+            final Widget bgScreen = widget.origin == LocationOrigin.profileAddress
+                ? CustProfileScreen(nav: (r, {param}) {})
+                : CustHomeScreen(nav: (r, {param}) {});
+
+            return Scaffold(
+              backgroundColor: Colors.transparent,
+              body: Stack(
+                children: [
+                  Positioned.fill(
+                    child: AbsorbPointer(
+                      absorbing: true,
+                      child: Container(
+                        color: Colors.white,
+                        child: bgScreen,
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: _goBack,
+                      child: ClipRect(
+                        clipBehavior: Clip.hardEdge,
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 3.0, sigmaY: 3.0),
+                          child: Container(
+                            color: Colors.white.withValues(alpha: 0.40),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (isDesktop)
+                    Center(
+                      child: Container(
+                        width: 580,
+                        constraints: const BoxConstraints(maxHeight: 640),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          boxShadow: AppShadows.card,
+                        ),
+                        child: dialogContent,
+                      ),
+                    )
+                  else
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        width: double.infinity,
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.of(context).size.height * 0.85,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                        ),
+                        child: SafeArea(
+                          top: false,
+                          child: dialogContent,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }
+
+          if (isDesktop) {
+            final Widget stepWidget = _buildStepContent(context, appState);
+            final double containerWidth = _step == _LocationStep.map ? 880.0 : 720.0;
+
+            return Scaffold(
+              backgroundColor: AppColors.gray50,
+              body: SafeArea(
+                child: Center(
+                  child: Container(
+                    width: containerWidth,
+                    margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                      boxShadow: AppShadows.card,
+                      border: Border.all(color: AppColors.gray200),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: stepWidget,
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return Scaffold(
+            backgroundColor: Colors.white,
+            body: _buildStepContent(context, appState),
+          );
+        },
       ),
     );
   }
@@ -1016,151 +1593,113 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
     }
   }
 
-  // ── STATE 1: Choose Your Location Modal over dimmed & blurred Home background ────────
+  // ── STATE 1: Choose Your Location Modal over dimmed Home background ────────
   Widget _buildInitialState(BuildContext context, AppState appState) {
-    final Widget bgScreen = widget.origin == LocationOrigin.profileAddress
-        ? CustProfileScreen(nav: (r, {param}) {})
-        : CustHomeScreen(nav: (r, {param}) {});
-
-    return Stack(
+    final Widget cardBody = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Real underlying background (gestures absorbed)
-        Positioned.fill(
-          child: AbsorbPointer(
-            absorbing: true,
-            child: bgScreen,
-          ),
-        ),
-
-        // Backdrop blur & dimming overlay
-        Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.4),
-            ),
-          ),
-        ),
-
-        // Bottom Sheet Card
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Choose Your Location',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.gray900,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                          SizedBox(height: 6),
-                          Text(
-                            'Enable location access to get the freshest meat delivered to your doorstep.',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: AppColors.gray600,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Red Pin Graphic
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      child: const Icon(
-                        Icons.location_on_rounded,
-                        color: AppColors.brandRed,
-                        size: 38,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Primary button: Use Current Location
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _currentLocationTitle = 'HSR Layout';
-                        _currentSubAddress = 'HSR Layout, Gowtham PG, Bengaluru, Karnataka, India';
-                        _previousStep = _LocationStep.initial;
-                        _step = _LocationStep.addressDetails;
-                      });
-                    },
-                    icon: const Icon(Icons.my_location_rounded, size: 18),
-                    label: const Text('Use Current Location'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.brandRed,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                      textStyle: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Inter',
-                      ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Choose Your Location',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.gray900,
+                      fontFamily: 'Inter',
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-
-                // Secondary button: Select Your Location
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        _step = _LocationStep.selectLocation;
-                      });
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.brandRed,
-                      side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
-                      backgroundColor: const Color(0xFFFEF2F2),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Inter',
-                      ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Enable location access to get the freshest meat delivered to your doorstep.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.gray600,
+                      height: 1.4,
                     ),
-                    child: const Text('Select Your Location'),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              child: const Icon(
+                Icons.location_on_rounded,
+                color: AppColors.brandRed,
+                size: 38,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              setState(() {
+                _currentLocationTitle = 'HSR Layout';
+                _currentSubAddress = 'HSR Layout, Gowtham PG, Bengaluru, Karnataka, India';
+                _previousStep = _LocationStep.initial;
+                _step = _LocationStep.addressDetails;
+              });
+            },
+            icon: const Icon(Icons.my_location_rounded, size: 18),
+            label: const Text('Use Current Location'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.brandRed,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () {
+              setState(() {
+                _step = _LocationStep.selectLocation;
+              });
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.brandRed,
+              side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
+              backgroundColor: const Color(0xFFFEF2F2),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Inter',
+              ),
+            ),
+            child: const Text('Select Your Location'),
           ),
         ),
       ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
+      child: cardBody,
     );
   }
 
@@ -1184,39 +1723,38 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
           ]
         : appState.addresses;
 
-    return SafeArea(
-      child: Column(
-        children: [
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
           // Top Header (Figma Aligned)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsets.fromLTRB(20, 16, 16, 12),
             child: Row(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.gray300),
-                  ),
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.gray800),
-                    onPressed: _goBack,
-                  ),
-                ),
                 const Expanded(
                   child: Text(
-                    'Saved Address',
-                    textAlign: TextAlign.center,
+                    'Select Delivery Location',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       color: AppColors.gray900,
+                      fontFamily: 'Inter',
                     ),
                   ),
                 ),
-                const SizedBox(width: 36),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.gray100,
+                  ),
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.gray700),
+                    onPressed: _goBack,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1425,8 +1963,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   // ── STATE 3: Search Location ────────────────────────────────────────────────
@@ -1438,10 +1975,9 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
       {'title': 'Koramangala', 'subtitle': 'Bengaluru, Karnataka, India'},
     ];
 
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
           // Top Search Bar Header with Close X
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -1532,8 +2068,7 @@ class _CustLocationScreenState extends State<CustLocationScreen> {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   // ── STATE 4: Map Location Selection ─────────────────────────────────────────

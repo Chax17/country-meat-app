@@ -35,28 +35,65 @@ class NotificationPermissionService {
     }
   }
 
-  /// Handles the initial notification permission request on first app open.
+  /// Marks the initial notification permission request as attempted.
   ///
-  /// Only prompts if not previously attempted and not already granted or permanently blocked.
-  Future<void> requestInitialPermissionIfNeeded() async {
+  /// Call this when the user taps "Not Now" or dismisses the in-app screen
+  /// so that they are not prompted again on subsequent launches.
+  Future<void> markInitialPromptAttempted() async {
+    await _markInitialPromptAttempted();
+  }
+
+  /// Checks if the in-app notification permission explanation screen should be shown.
+  ///
+  /// Returns false if:
+  /// - The user has already been prompted previously.
+  /// - The permission is already granted or provisional.
+  /// - The permission is permanently denied (blocked in OS settings).
+  ///
+  /// Returns true only when an initial prompt is needed and requestable.
+  Future<bool> shouldShowInitialPermissionScreen() async {
     try {
       final alreadyPrompted = await hasPromptedInitialPermission();
       if (alreadyPrompted) {
-        return;
+        return false;
       }
 
       final status = await Permission.notification.status;
       if (status.isGranted || status.isProvisional || status.isPermanentlyDenied) {
         await _markInitialPromptAttempted();
-        return;
+        return false;
       }
 
-      // First time and permission is requestable: prompt the native OS dialog
-      await Permission.notification.request();
+      return true;
+    } catch (e) {
+      debugPrint('Error checking if initial notification permission is needed: $e');
+      return false;
+    }
+  }
 
-      // Persist that the initial request attempt was made so that
-      // a denial does not cause repeated prompts on future app launches.
+  /// Prompts the native OS notification permission dialog and records that
+  /// an attempt has been made.
+  Future<PermissionStatus> requestPermission() async {
+    try {
+      final status = await Permission.notification.request();
       await _markInitialPromptAttempted();
+      return status;
+    } catch (e) {
+      debugPrint('Error requesting notification permission: $e');
+      await _markInitialPromptAttempted();
+      return PermissionStatus.denied;
+    }
+  }
+
+  /// Handles the initial notification permission request on first app open.
+  ///
+  /// Backward compatible helper; delegates to [shouldShowInitialPermissionScreen]
+  /// and [requestPermission].
+  Future<void> requestInitialPermissionIfNeeded() async {
+    try {
+      final shouldShow = await shouldShowInitialPermissionScreen();
+      if (!shouldShow) return;
+      await requestPermission();
     } catch (e) {
       debugPrint('Error during initial notification permission request: $e');
     }

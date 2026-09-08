@@ -18,6 +18,7 @@ import 'wallet_screen.dart';
 import 'splash_otp_location_screens.dart';
 import 'search_screen.dart';
 import 'widgets/desktop_header.dart';
+import 'notification_permission_screen.dart';
 import '../../services/notification_permission_service.dart';
 
 enum CustomerAuthStep { splash, onboarding, login, otp, location, done }
@@ -60,14 +61,37 @@ class _CustomerShellState extends State<CustomerShell> {
   final List<_NavHistoryItem> _history = [];
 
   bool _hasTriggeredStartupPermissionCheck = false;
+  String _screenBeforePermission = 'home';
 
   void _triggerStartupPermissionCheckIfNeeded() {
     if (_hasTriggeredStartupPermissionCheck) return;
     _hasTriggeredStartupPermissionCheck = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        NotificationPermissionService().requestInitialPermissionIfNeeded();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final shouldShow =
+          await NotificationPermissionService().shouldShowInitialPermissionScreen();
+      if (shouldShow && mounted) {
+        setState(() {
+          _screenBeforePermission = _screen;
+          _screen = 'notification_permission';
+        });
       }
+    });
+  }
+
+  Future<void> _handleNotificationPermissionAllow() async {
+    await NotificationPermissionService().requestPermission();
+    if (!mounted) return;
+    setState(() {
+      _screen = _screenBeforePermission;
+    });
+  }
+
+  Future<void> _handleNotificationPermissionDismiss() async {
+    await NotificationPermissionService().markInitialPromptAttempted();
+    if (!mounted) return;
+    setState(() {
+      _screen = _screenBeforePermission;
     });
   }
 
@@ -120,6 +144,10 @@ class _CustomerShellState extends State<CustomerShell> {
   }
 
   void _handleBack({String? param}) {
+    if (_screen == 'notification_permission') {
+      _handleNotificationPermissionDismiss();
+      return;
+    }
     if (_history.isNotEmpty) {
       _pop(param: param);
       return;
@@ -423,6 +451,11 @@ class _CustomerShellState extends State<CustomerShell> {
           },
           onBack: () => _nav('back', param: isProfileAddress ? 'addresses' : null),
         );
+      } else if (_screen == 'notification_permission') {
+        content = CustNotificationPermissionScreen(
+          onAllow: _handleNotificationPermissionAllow,
+          onNotNow: _handleNotificationPermissionDismiss,
+        );
       } else {
         content = Scaffold(
           backgroundColor: AppColors.white,
@@ -512,6 +545,11 @@ class _CustomerShellState extends State<CustomerShell> {
                 onContinue: () => _nav('back', param: isProfileAddress ? 'addresses' : null),
                 onBack: () => _nav('back', param: isProfileAddress ? 'addresses' : null),
               );
+            } else if (_screen == 'notification_permission') {
+              desktopBody = CustNotificationPermissionScreen(
+                onAllow: _handleNotificationPermissionAllow,
+                onNotNow: _handleNotificationPermissionDismiss,
+              );
             } else {
               desktopBody = _buildScreenBody();
             }
@@ -574,6 +612,11 @@ class _CustomerShellState extends State<CustomerShell> {
                 onContinue: () => _nav('back', param: isProfileAddress ? 'addresses' : null),
                 onBack: () => _nav('back', param: isProfileAddress ? 'addresses' : null),
               );
+            } else if (_screen == 'notification_permission') {
+              tabletBody = CustNotificationPermissionScreen(
+                onAllow: _handleNotificationPermissionAllow,
+                onNotNow: _handleNotificationPermissionDismiss,
+              );
             } else {
               tabletBody = _buildScreenBody();
             }
@@ -581,7 +624,8 @@ class _CustomerShellState extends State<CustomerShell> {
             final bool isOverlayScreen = _screen == 'confirmation' ||
                 _screen == 'tracking' ||
                 _screen == 'payment' ||
-                _screen == 'location';
+                _screen == 'location' ||
+                _screen == 'notification_permission';
 
             responsiveContent = Scaffold(
               backgroundColor: AppColors.white,
